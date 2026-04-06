@@ -1,0 +1,118 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+const DESIGN_RECOMMENDATION_PROMPT = `You are an interior designer. Given the space analysis, user dimensions, and preferences, suggest a cohesive design.
+
+Rules:
+- Every item MUST fit within the provided dimensions (leave 2-3cm clearance)
+- Respect constraints (don't block radiators, windows, doors)
+- Stay within budget
+- Suggest specific, searchable product types (not vague descriptions)
+- Include wall color if relevant
+- The search_query should be optimized for finding products on Amazon.de or German furniture stores
+
+Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
+{
+  "concept": "A cozy reading corner with warm tones...",
+  "items": [
+    {
+      "type": "bookshelf",
+      "search_query": "narrow bookshelf 40cm wide white",
+      "max_width_cm": 40,
+      "max_depth_cm": 30,
+      "max_height_cm": 180,
+      "color": "white or light oak",
+      "placement": "Against left wall, flush with corner",
+      "priority": "essential"
+    }
+  ],
+  "wall_color": {
+    "name": "Warm Linen",
+    "hex": "#F5E6D3",
+    "note": "Pairs well with the oak furniture"
+  },
+  "styling_tip": "Add a small plant on the top shelf..."
+}`;
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  try {
+    const { photo, spaceAnalysis, measurements, preferences } = req.body;
+
+    if (!photo || !spaceAnalysis || !measurements || !preferences) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Extract base64 data and media type
+    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+    const mediaTypeMatch = photo.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
+
+    // Build context
+    const measurementsText = measurements
+      .filter((m: { value: number | null }) => m.value !== null)
+      .map((m: { label: string; value: number }) => `${m.label}: ${m.value}cm`)
+      .join('\n');
+
+    const budgetMap: Record<string, string> = {
+      under_50: 'Under €50',
+      '50_150': '€50-150',
+      '150_500': '€150-500',
+      over_500: '€500+',
+    };
+
+    const contextText = `
+Space Analysis:
+- Type: ${spaceAnalysis.space_type}
+- Existing items: ${spaceAnalysis.existing_items.join(', ')}
+- Constraints: ${spaceAnalysis.constraints.join(', ')}
+- Lighting: ${spaceAnalysis.lighting}
+
+Measurements:
+${measurementsText}
+
+User Preferences:
+- Space type: ${preferences.spaceType || 'Not specified'}
+- Goal: ${preferences.goal || 'Not specified'}
+- Style: ${preferences.style || 'Not specified'}
+- Budget: ${preferences.budget ? budgetMap[preferences.budget] : 'Not specified'}
+- Special needs: ${preferences.specialNeeds.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
+`;
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' });
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType,
+          data: base64Data,
+        },
+      },
+      { text: `${DESIGN_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
+    ]);
+
+    const response = result.response;
+    const text = response.text();
+
+    // Clean up response - remove markdown code blocks if present
+    const cleanedText = text
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+
+    const recommendation = JSON.parse(cleanedText);
+    return res.status(200).json(recommendation);
+  } catch (error) {
+    console.error('Recommend error:', error);
+    return res.status(500).json({ error: 'Failed to generate recommendation' });
+  }
+}

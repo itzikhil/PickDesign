@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #1a1a1a;
+  --cream: #FAF7F2;
+  --warm: #E8DFD3;
+  --accent: #C4703F;
+  --accent-light: #F0DCC8;
+  --sage: #7A8B6F;
+  --sage-light: #E8EDE4;
+}
+
+@theme {
+  --color-ink: var(--ink);
+  --color-cream: var(--cream);
+  --color-warm: var(--warm);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-sage: var(--sage);
+  --color-sage-light: var(--sage-light);
+  --font-family-display: 'Playfair Display', serif;
+  --font-family-sans: 'DM Sans', sans-serif;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background: var(--cream);
+  color: var(--ink);
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
