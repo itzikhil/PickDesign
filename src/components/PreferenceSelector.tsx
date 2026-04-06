@@ -77,14 +77,19 @@ interface IntentCardProps {
 }
 
 function IntentCard({ value, label, description, selected, onClick }: IntentCardProps) {
+  // Use sage for refresh, accent for others
+  const isRefresh = value === 'refresh';
+  const selectedBg = isRefresh ? 'bg-sage' : 'bg-accent';
+  const selectedRing = isRefresh ? 'ring-sage' : 'ring-accent';
+
   return (
     <button
       onClick={() => onClick(value)}
       className={`
         w-full p-5 rounded-2xl text-left transition-all
         ${selected
-          ? 'bg-accent text-white shadow-lg ring-2 ring-accent ring-offset-2'
-          : 'bg-white border border-warm hover:border-accent hover:shadow-md'
+          ? `${selectedBg} text-white shadow-lg ring-2 ${selectedRing} ring-offset-2`
+          : 'bg-white border border-warm hover:border-sage hover:shadow-md'
         }
       `}
     >
@@ -98,14 +103,15 @@ function IntentCard({ value, label, description, selected, onClick }: IntentCard
   );
 }
 
-// Style card backgrounds (gradients as placeholders for real images)
-const styleBackgrounds: Record<StylePreference, string> = {
-  scandinavian: 'bg-gradient-to-br from-gray-100 to-stone-200',
-  modern: 'bg-gradient-to-br from-slate-700 to-slate-900',
-  industrial: 'bg-gradient-to-br from-zinc-500 to-zinc-700',
-  bohemian: 'bg-gradient-to-br from-amber-200 to-orange-300',
-  classic: 'bg-gradient-to-br from-stone-200 to-stone-400',
-  no_preference: 'bg-gradient-to-br from-gray-300 to-gray-400',
+// Style card images from Unsplash
+const styleImages: Record<StylePreference, string | null> = {
+  modern: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&q=80',
+  scandinavian: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&q=80',
+  industrial: 'https://images.unsplash.com/photo-1600585152220-90363fe7e115?w=400&q=80',
+  bohemian: 'https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?w=400&q=80',
+  classic: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=400&q=80',
+  minimalist: 'https://images.unsplash.com/photo-1598928506311-c55ece93a745?w=400&q=80',
+  no_preference: null, // Neutral card without image
 };
 
 interface StyleCardProps {
@@ -116,20 +122,55 @@ interface StyleCardProps {
 }
 
 function StyleCard({ value, label, selected, onClick }: StyleCardProps) {
-  const isLight = ['scandinavian', 'bohemian', 'classic', 'no_preference'].includes(value);
+  const imageUrl = styleImages[value];
+  const isNoPreference = value === 'no_preference';
+
+  // No preference gets a simple neutral card
+  if (isNoPreference) {
+    return (
+      <button
+        onClick={() => onClick(value)}
+        className={`
+          relative aspect-[4/3] rounded-2xl overflow-hidden transition-all
+          bg-warm/50 flex items-center justify-center
+          ${selected
+            ? 'ring-4 ring-sage ring-offset-2 scale-[1.02] shadow-xl'
+            : 'hover:scale-[1.02] hover:shadow-lg hover:bg-warm/70'
+          }
+        `}
+      >
+        {selected && (
+          <div className="absolute top-3 right-3 w-8 h-8 bg-sage rounded-full flex items-center justify-center shadow-lg">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        )}
+        <p className="font-display text-lg font-semibold text-ink/70">{label}</p>
+      </button>
+    );
+  }
 
   return (
     <button
       onClick={() => onClick(value)}
       className={`
         relative aspect-[4/3] rounded-2xl overflow-hidden transition-all
-        ${styleBackgrounds[value]}
         ${selected
           ? 'ring-4 ring-accent ring-offset-2 scale-[1.02] shadow-xl'
           : 'hover:scale-[1.02] hover:shadow-lg'
         }
       `}
     >
+      {/* Background image */}
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={label}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+
       {/* Selected checkmark */}
       {selected && (
         <div className="absolute top-3 right-3 w-8 h-8 bg-accent rounded-full flex items-center justify-center shadow-lg">
@@ -140,8 +181,8 @@ function StyleCard({ value, label, selected, onClick }: StyleCardProps) {
       )}
 
       {/* Label */}
-      <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-        <p className={`font-display text-lg font-semibold ${isLight ? 'text-white' : 'text-white'}`}>
+      <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+        <p className="font-display text-lg font-semibold text-white">
           {label}
         </p>
       </div>

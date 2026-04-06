@@ -15,6 +15,11 @@ export function PreferencesPage() {
     }
   }, [state.photo, state.spaceAnalysis, navigate]);
 
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const handleComplete = () => {
     navigate('/results');
   };
