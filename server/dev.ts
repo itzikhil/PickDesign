@@ -350,7 +350,7 @@ app.post('/api/render', async (req, res) => {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp-image-generation',
+        model: 'gemini-3.1-flash-image-preview',
         contents: [
           {
             role: 'user',
@@ -386,7 +386,7 @@ app.post('/api/render', async (req, res) => {
       const moodBoardPrompt = buildMoodBoardPrompt(recommendation);
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp-image-generation',
+        model: 'gemini-3.1-flash-image-preview',
         contents: [
           {
             role: 'user',
