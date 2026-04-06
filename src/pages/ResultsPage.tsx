@@ -9,17 +9,18 @@ import { InteractivePhotoOverlay } from '../components/InteractivePhotoOverlay';
 import { useApp } from '../context/AppContext';
 import { generateDesignRecommendation } from '../lib/claude';
 import { matchProducts } from '../lib/products';
-import type { RecommendedItem } from '../lib/types';
+import type { RecommendedItem, DesignIntent } from '../lib/types';
 
 async function renderDesignVisualization(
   photo: string,
-  recommendation: { concept: string; items: RecommendedItem[]; wall_color?: { name: string; hex: string } }
+  recommendation: { concept: string; items: RecommendedItem[]; wall_color?: { name: string; hex: string } },
+  designIntent: DesignIntent
 ): Promise<{ image: string | null; type: 'redesign' | 'moodboard' | null }> {
   try {
     const response = await fetch('/api/render', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photo, recommendation }),
+      body: JSON.stringify({ photo, recommendation, designIntent }),
     });
 
     if (!response.ok) {
@@ -45,16 +46,17 @@ export function ResultsPage() {
 
   // Redirect if missing required data
   useEffect(() => {
-    if (!state.photo || !state.spaceAnalysis || state.preferences.spaceTypes.length === 0) {
+    if (!state.photo || !state.spaceAnalysis || !state.preferences.designIntent || state.preferences.spaceTypes.length === 0) {
       navigate('/');
     }
-  }, [state.photo, state.spaceAnalysis, state.preferences.spaceTypes, navigate]);
+  }, [state.photo, state.spaceAnalysis, state.preferences.designIntent, state.preferences.spaceTypes, navigate]);
 
   // Generate design on mount
   useEffect(() => {
     if (
       state.photo &&
       state.spaceAnalysis &&
+      state.preferences.designIntent &&
       state.preferences.spaceTypes.length > 0 &&
       !state.designRecommendation &&
       !state.isGeneratingDesign
@@ -78,7 +80,11 @@ export function ResultsPage() {
 
           // Try to generate visualization (non-blocking)
           dispatch({ type: 'SET_RENDERING_IMAGE', payload: true });
-          const renderResult = await renderDesignVisualization(state.photo!, recommendation);
+          const renderResult = await renderDesignVisualization(
+            state.photo!,
+            recommendation,
+            state.preferences.designIntent || 'refresh'
+          );
           dispatch({
             type: 'SET_RENDERED_IMAGE',
             payload: { image: renderResult.image, renderType: renderResult.type },

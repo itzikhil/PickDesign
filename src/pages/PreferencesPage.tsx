@@ -45,11 +45,13 @@ export function PreferencesPage() {
 
           {/* Preference selector */}
           <PreferenceSelector
+            designIntent={state.preferences.designIntent}
             spaceTypes={state.preferences.spaceTypes}
             goals={state.preferences.goals}
             styles={state.preferences.styles}
             budget={state.preferences.budget}
             specialNeeds={state.preferences.specialNeeds}
+            onDesignIntentChange={(v) => dispatch({ type: 'SET_DESIGN_INTENT', payload: v })}
             onSpaceTypeToggle={(v) => dispatch({ type: 'TOGGLE_SPACE_TYPE', payload: v })}
             onGoalToggle={(v) => dispatch({ type: 'TOGGLE_GOAL', payload: v })}
             onStyleToggle={(v) => dispatch({ type: 'TOGGLE_STYLE', payload: v })}

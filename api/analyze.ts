@@ -8,6 +8,10 @@ Analyze the uploaded photo and identify:
 3. Existing furniture or fixtures
 4. Lighting conditions
 5. Any constraints (windows, doors, outlets, radiators)
+6. Suggested design intent based on the current state:
+   - "redesign" if the room is cluttered, messy, or has outdated furniture that should be replaced
+   - "refresh" if the room is already organized but could use some finishing touches or additional items
+   - "fill" if the room is mostly empty and needs furnishing
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
 {
@@ -22,7 +26,8 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text, no
   ],
   "existing_items": ["radiator on right wall", "window"],
   "constraints": ["radiator limits depth on right side"],
-  "lighting": "natural light from window, no overhead fixture visible"
+  "lighting": "natural light from window, no overhead fixture visible",
+  "suggested_intent": "refresh"
 }`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

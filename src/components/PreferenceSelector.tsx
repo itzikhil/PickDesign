@@ -1,4 +1,5 @@
 import type {
+  DesignIntent,
   SpaceType,
   Goal,
   StylePreference,
@@ -6,6 +7,7 @@ import type {
   SpecialNeed,
 } from '../lib/types';
 import {
+  DESIGN_INTENTS,
   SPACE_TYPES,
   GOALS,
   STYLES,
@@ -14,11 +16,13 @@ import {
 } from '../lib/types';
 
 interface PreferenceSelectorProps {
+  designIntent: DesignIntent | null;
   spaceTypes: SpaceType[];
   goals: Goal[];
   styles: StylePreference[];
   budget: BudgetRange | null;
   specialNeeds: SpecialNeed[];
+  onDesignIntentChange: (value: DesignIntent) => void;
   onSpaceTypeToggle: (value: SpaceType) => void;
   onGoalToggle: (value: Goal) => void;
   onStyleToggle: (value: StylePreference) => void;
@@ -64,6 +68,36 @@ function ChipButton<T extends string>({
   );
 }
 
+interface IntentCardProps {
+  value: DesignIntent;
+  label: string;
+  description: string;
+  selected: boolean;
+  onClick: (value: DesignIntent) => void;
+}
+
+function IntentCard({ value, label, description, selected, onClick }: IntentCardProps) {
+  return (
+    <button
+      onClick={() => onClick(value)}
+      className={`
+        w-full p-4 rounded-xl text-left transition-all
+        ${selected
+          ? 'bg-accent text-white shadow-lg ring-2 ring-accent ring-offset-2'
+          : 'bg-white border border-warm hover:border-accent hover:shadow-md'
+        }
+      `}
+    >
+      <p className={`font-semibold text-lg ${selected ? 'text-white' : 'text-ink'}`}>
+        {label}
+      </p>
+      <p className={`text-sm mt-1 ${selected ? 'text-white/80' : 'text-ink/60'}`}>
+        {description}
+      </p>
+    </button>
+  );
+}
+
 interface QuestionSectionProps {
   title: string;
   subtitle?: string;
@@ -91,11 +125,13 @@ function QuestionSection({ title, subtitle, multiSelect, children }: QuestionSec
 }
 
 export function PreferenceSelector({
+  designIntent,
   spaceTypes,
   goals,
   styles,
   budget,
   specialNeeds,
+  onDesignIntentChange,
   onSpaceTypeToggle,
   onGoalToggle,
   onStyleToggle,
@@ -103,10 +139,32 @@ export function PreferenceSelector({
   onSpecialNeedToggle,
   onComplete,
 }: PreferenceSelectorProps) {
-  const isComplete = spaceTypes.length > 0 && goals.length > 0 && styles.length > 0 && budget;
+  const isComplete = designIntent && spaceTypes.length > 0 && goals.length > 0 && styles.length > 0 && budget;
 
   return (
     <div className="w-full max-w-2xl mx-auto">
+      {/* Design Intent - First question */}
+      <div className="mb-10">
+        <h3 className="text-xl font-semibold text-ink mb-2">
+          What would you like to do with this space?
+        </h3>
+        <p className="text-sm text-ink/60 mb-4">
+          This helps us tailor the design approach
+        </p>
+        <div className="space-y-3">
+          {DESIGN_INTENTS.map((option) => (
+            <IntentCard
+              key={option.value}
+              value={option.value}
+              label={option.label}
+              description={option.description}
+              selected={designIntent === option.value}
+              onClick={onDesignIntentChange}
+            />
+          ))}
+        </div>
+      </div>
+
       <QuestionSection
         title="What type of space is this?"
         subtitle="Select all that apply"
@@ -194,7 +252,7 @@ export function PreferenceSelector({
           }
         `}
       >
-        {isComplete ? 'Generate Design' : 'Select at least one option for each category'}
+        {isComplete ? 'Generate Design' : 'Complete all sections to continue'}
       </button>
     </div>
   );

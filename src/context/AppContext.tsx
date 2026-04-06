@@ -6,6 +6,7 @@ import type {
   UserPreferences,
   DesignRecommendation,
   ProductMatch,
+  DesignIntent,
   SpaceType,
   Goal,
   StylePreference,
@@ -14,6 +15,7 @@ import type {
 } from '../lib/types';
 
 const initialPreferences: UserPreferences = {
+  designIntent: null,
   spaceTypes: [],
   goals: [],
   styles: [],
@@ -42,6 +44,7 @@ type Action =
   | { type: 'SET_SPACE_ANALYSIS'; payload: SpaceAnalysis }
   | { type: 'SET_MEASUREMENTS'; payload: Measurement[] }
   | { type: 'UPDATE_MEASUREMENT'; payload: { id: string; value: number | null } }
+  | { type: 'SET_DESIGN_INTENT'; payload: DesignIntent }
   | { type: 'TOGGLE_SPACE_TYPE'; payload: SpaceType }
   | { type: 'TOGGLE_GOAL'; payload: Goal }
   | { type: 'TOGGLE_STYLE'; payload: StylePreference }
@@ -75,6 +78,10 @@ function reducer(state: AppState, action: Action): AppState {
           label: s.label,
           value: null,
         })),
+        // Set suggested design intent as default if provided
+        preferences: action.payload.suggested_intent
+          ? { ...state.preferences, designIntent: action.payload.suggested_intent }
+          : state.preferences,
       };
     case 'SET_MEASUREMENTS':
       return { ...state, measurements: action.payload };
@@ -84,6 +91,11 @@ function reducer(state: AppState, action: Action): AppState {
         measurements: state.measurements.map((m) =>
           m.id === action.payload.id ? { ...m, value: action.payload.value } : m
         ),
+      };
+    case 'SET_DESIGN_INTENT':
+      return {
+        ...state,
+        preferences: { ...state.preferences, designIntent: action.payload },
       };
     case 'TOGGLE_SPACE_TYPE':
       return {

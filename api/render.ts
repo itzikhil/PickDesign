@@ -21,7 +21,9 @@ interface Recommendation {
   wall_color?: WallColor;
 }
 
-function buildDetailedPrompt(recommendation: Recommendation): string {
+type DesignIntent = 'refresh' | 'redesign' | 'fill';
+
+function buildDetailedPrompt(recommendation: Recommendation, designIntent: DesignIntent): string {
   const itemDescriptions = recommendation.items
     .map((item) => {
       const dimensions = item.max_width_cm
@@ -35,13 +37,35 @@ function buildDetailedPrompt(recommendation: Recommendation): string {
     ? `Wall color: ${recommendation.wall_color.name} (${recommendation.wall_color.hex}).`
     : '';
 
-  return `Based on this room photo, create a photorealistic interior design visualization of the same space with the following items added: [${itemDescriptions}].
+  switch (designIntent) {
+    case 'redesign':
+      return `Completely redesign this room. Remove all existing furniture, clutter, and items. Replace with a clean, professionally styled space with new furniture: [${itemDescriptions}].
 
-Keep the same room structure, lighting, and perspective. ${wallColorText}
+Keep the same room structure (walls, floor, windows, doors) but everything else should be new. ${wallColorText}
 
 Design concept: ${recommendation.concept}
 
-The result should look like a professional interior design rendering that could appear in an interior design magazine. Make the new furniture and decor look naturally integrated into the space, with realistic shadows and lighting that match the original photo.`;
+Make it look like a professional interior design magazine photo. The space should feel fresh, organized, and completely transformed.`;
+
+    case 'fill':
+      return `This is an empty space. Furnish it with: [${itemDescriptions}].
+
+${wallColorText}
+
+Design concept: ${recommendation.concept}
+
+Make it look lived-in and inviting. The furniture should be naturally placed and the space should feel warm and welcoming, like a professionally styled home.`;
+
+    case 'refresh':
+    default:
+      return `Keep the existing layout and furniture in this room, but add: [${itemDescriptions}] and organize the space.
+
+${wallColorText}
+
+Design concept: ${recommendation.concept}
+
+The result should look like a professional interior design rendering that enhances the current setup. Add the new items naturally while respecting the existing furniture placement.`;
+  }
 }
 
 function buildMoodBoardPrompt(recommendation: Recommendation): string {
@@ -72,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not configured' });
     }
 
-    const { photo, recommendation } = req.body;
+    const { photo, recommendation, designIntent = 'refresh' } = req.body;
 
     if (!photo) {
       return res.status(400).json({ error: 'Missing required field: photo' });
@@ -89,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ai = new GoogleGenAI({ apiKey });
 
     // First attempt: Image-to-image redesign
-    const redesignPrompt = buildDetailedPrompt(recommendation);
+    const redesignPrompt = buildDetailedPrompt(recommendation, designIntent);
 
     try {
       const response = await ai.models.generateContent({

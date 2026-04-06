@@ -1,7 +1,32 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const DESIGN_RECOMMENDATION_PROMPT = `You are an interior designer. Given the space analysis, user dimensions, and preferences, suggest a cohesive design.
+function getDesignIntentInstructions(intent: string): string {
+  switch (intent) {
+    case 'redesign':
+      return `DESIGN APPROACH: Complete redesign
+- The user wants to start fresh with new furniture and layout
+- Ignore all existing furniture in the photo - it will be removed
+- Design as if the room is empty (keep only fixed elements like windows, doors, radiators)
+- Suggest a complete furniture set for the space
+- Be bold with the design - this is a fresh start`;
+    case 'fill':
+      return `DESIGN APPROACH: Furnish empty space
+- The space is empty and needs furnishing from scratch
+- Suggest essential furniture pieces to make the space functional and inviting
+- Include both functional items and decorative elements
+- Make the space feel lived-in and welcoming`;
+    case 'refresh':
+    default:
+      return `DESIGN APPROACH: Refresh and organize
+- Keep the existing layout and major furniture pieces
+- Suggest items that complement what's already there
+- Focus on organization, finishing touches, and accent pieces
+- Add items that enhance the current setup without major changes`;
+  }
+}
+
+const BASE_RECOMMENDATION_PROMPT = `You are an interior designer. Given the space analysis, user dimensions, preferences, and design approach, suggest a cohesive design.
 
 Rules:
 - Every item MUST fit within the provided dimensions (leave 2-3cm clearance)
@@ -95,7 +120,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? preferences.styles.join(', ')
       : preferences.style || 'Not specified';
 
+    const designIntent = preferences.designIntent || 'refresh';
+    const intentInstructions = getDesignIntentInstructions(designIntent);
+
     const contextText = `
+${intentInstructions}
+
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
 - Existing items: ${spaceAnalysis.existing_items?.join(', ') || 'None'}
@@ -125,7 +155,7 @@ User Preferences:
             data: base64Data,
           },
         },
-        { text: `${DESIGN_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
+        { text: `${BASE_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
       ]);
     } catch (geminiError) {
       const message = geminiError instanceof Error ? geminiError.message : String(geminiError);

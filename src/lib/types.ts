@@ -12,6 +12,7 @@ export interface SpaceAnalysis {
   existing_items: string[];
   constraints: string[];
   lighting: string;
+  suggested_intent?: 'refresh' | 'redesign' | 'fill'; // AI-suggested design intent based on room state
 }
 
 // Measurement Types
@@ -22,6 +23,7 @@ export interface Measurement {
 }
 
 // Preference Types
+export type DesignIntent = 'refresh' | 'redesign' | 'fill';
 export type SpaceType = 'living_room' | 'bedroom' | 'kids_room' | 'office' | 'kitchen' | 'bathroom' | 'hallway' | 'other';
 export type Goal = 'storage' | 'seating' | 'decoration' | 'workspace' | 'display' | 'sleep' | 'play';
 export type StylePreference = 'modern' | 'scandinavian' | 'industrial' | 'bohemian' | 'classic' | 'no_preference';
@@ -29,6 +31,7 @@ export type BudgetRange = 'under_50' | '50_150' | '150_500' | 'over_500';
 export type SpecialNeed = 'pet_friendly' | 'child_safe' | 'waterproof' | 'wheelchair_accessible' | 'none';
 
 export interface UserPreferences {
+  designIntent: DesignIntent | null;
   spaceTypes: SpaceType[];
   goals: Goal[];
   styles: StylePreference[];
@@ -115,6 +118,12 @@ export interface AppState {
 }
 
 // Preference Options for UI
+export const DESIGN_INTENTS: { value: DesignIntent; label: string; description: string }[] = [
+  { value: 'refresh', label: 'Refresh it', description: 'Keep the layout, just organize and add finishing touches' },
+  { value: 'redesign', label: 'Redesign it', description: 'Start fresh with new furniture and layout' },
+  { value: 'fill', label: 'Fill it', description: "It's empty and needs furnishing" },
+];
+
 export const SPACE_TYPES: { value: SpaceType; label: string }[] = [
   { value: 'living_room', label: 'Living Room' },
   { value: 'bedroom', label: 'Bedroom' },
