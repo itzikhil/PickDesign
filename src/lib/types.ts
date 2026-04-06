@@ -29,9 +29,9 @@ export type BudgetRange = 'under_50' | '50_150' | '150_500' | 'over_500';
 export type SpecialNeed = 'pet_friendly' | 'child_safe' | 'waterproof' | 'wheelchair_accessible' | 'none';
 
 export interface UserPreferences {
-  spaceType: SpaceType | null;
-  goal: Goal | null;
-  style: StylePreference | null;
+  spaceTypes: SpaceType[];
+  goals: Goal[];
+  styles: StylePreference[];
   budget: BudgetRange | null;
   specialNeeds: SpecialNeed[];
 }
@@ -46,6 +46,8 @@ export interface RecommendedItem {
   color: string;
   placement: string;
   priority: 'essential' | 'recommended' | 'optional';
+  price_range_eur?: { min: number; max: number };
+  position_hint?: { x: number; y: number }; // 0-100 percentage position on image
 }
 
 export interface WallColor {
@@ -105,6 +107,10 @@ export interface AppState {
   // Step 6: Products
   productMatches: ProductMatch[];
   isLoadingProducts: boolean;
+
+  // Step 7: Rendered visualization
+  renderedImage: string | null; // base64 data URL of AI-generated redesign
+  isRenderingImage: boolean;
 }
 
 // Preference Options for UI

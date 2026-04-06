@@ -45,14 +45,14 @@ export function PreferencesPage() {
 
           {/* Preference selector */}
           <PreferenceSelector
-            spaceType={state.preferences.spaceType}
-            goal={state.preferences.goal}
-            style={state.preferences.style}
+            spaceTypes={state.preferences.spaceTypes}
+            goals={state.preferences.goals}
+            styles={state.preferences.styles}
             budget={state.preferences.budget}
             specialNeeds={state.preferences.specialNeeds}
-            onSpaceTypeChange={(v) => dispatch({ type: 'SET_SPACE_TYPE', payload: v })}
-            onGoalChange={(v) => dispatch({ type: 'SET_GOAL', payload: v })}
-            onStyleChange={(v) => dispatch({ type: 'SET_STYLE', payload: v })}
+            onSpaceTypeToggle={(v) => dispatch({ type: 'TOGGLE_SPACE_TYPE', payload: v })}
+            onGoalToggle={(v) => dispatch({ type: 'TOGGLE_GOAL', payload: v })}
+            onStyleToggle={(v) => dispatch({ type: 'TOGGLE_STYLE', payload: v })}
             onBudgetChange={(v) => dispatch({ type: 'SET_BUDGET', payload: v })}
             onSpecialNeedToggle={(v) => dispatch({ type: 'TOGGLE_SPECIAL_NEED', payload: v })}
             onComplete={handleComplete}

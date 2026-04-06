@@ -1,30 +1,57 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { DesignSuggestion } from '../components/DesignSuggestion';
 import { ProductCard } from '../components/ProductCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { InteractivePhotoOverlay } from '../components/InteractivePhotoOverlay';
 import { useApp } from '../context/AppContext';
 import { generateDesignRecommendation } from '../lib/claude';
 import { matchProducts } from '../lib/products';
+import type { RecommendedItem } from '../lib/types';
+
+async function renderDesignVisualization(
+  photo: string,
+  recommendation: { concept: string; items: RecommendedItem[]; wall_color?: { name: string; hex: string } }
+): Promise<string | null> {
+  try {
+    const response = await fetch('/api/render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo, recommendation }),
+    });
+
+    if (!response.ok) {
+      console.warn('Image rendering not available');
+      return null;
+    }
+
+    const data = await response.json();
+    return data.image || null;
+  } catch (error) {
+    console.warn('Image rendering failed:', error);
+    return null;
+  }
+}
 
 export function ResultsPage() {
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const productSectionRef = useRef<HTMLDivElement>(null);
 
   // Redirect if missing required data
   useEffect(() => {
-    if (!state.photo || !state.spaceAnalysis || !state.preferences.spaceType) {
+    if (!state.photo || !state.spaceAnalysis || state.preferences.spaceTypes.length === 0) {
       navigate('/');
     }
-  }, [state.photo, state.spaceAnalysis, state.preferences.spaceType, navigate]);
+  }, [state.photo, state.spaceAnalysis, state.preferences.spaceTypes, navigate]);
 
   // Generate design on mount
   useEffect(() => {
     if (
       state.photo &&
       state.spaceAnalysis &&
-      state.preferences.spaceType &&
+      state.preferences.spaceTypes.length > 0 &&
       !state.designRecommendation &&
       !state.isGeneratingDesign
     ) {
@@ -44,6 +71,12 @@ export function ResultsPage() {
           const matches = await matchProducts(recommendation.items);
           dispatch({ type: 'SET_PRODUCT_MATCHES', payload: matches });
           dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
+
+          // Try to generate visualization (non-blocking)
+          dispatch({ type: 'SET_RENDERING_IMAGE', payload: true });
+          const renderedImage = await renderDesignVisualization(state.photo!, recommendation);
+          dispatch({ type: 'SET_RENDERED_IMAGE', payload: renderedImage });
+          dispatch({ type: 'SET_RENDERING_IMAGE', payload: false });
         })
         .catch((error) => {
           console.error('Failed to generate design:', error);
@@ -69,9 +102,27 @@ export function ResultsPage() {
     navigate('/preferences');
   };
 
+  const handleTryDifferentStyle = () => {
+    // Clear only the design, keep photo and measurements
+    dispatch({ type: 'CLEAR_DESIGN' });
+    navigate('/preferences');
+  };
+
   const handleStartOver = () => {
     dispatch({ type: 'RESET' });
     navigate('/');
+  };
+
+  const handlePinClick = (_item: RecommendedItem, index: number) => {
+    // Scroll to the item in the design suggestion
+    const element = document.getElementById(`item-${index}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('ring-2', 'ring-accent');
+      setTimeout(() => {
+        element.classList.remove('ring-2', 'ring-accent');
+      }, 2000);
+    }
   };
 
   if (!state.photo || !state.spaceAnalysis) {
@@ -105,11 +156,60 @@ export function ResultsPage() {
                 </p>
               </div>
 
+              {/* Hero: Rendered visualization or original photo */}
+              <div className="mb-8">
+                {state.isRenderingImage ? (
+                  <div className="bg-white rounded-2xl p-8 border border-warm">
+                    <LoadingSpinner
+                      message="Generating visualization"
+                      submessage="Creating a preview of your redesigned space..."
+                    />
+                  </div>
+                ) : state.renderedImage ? (
+                  <div className="relative">
+                    <div className="absolute top-4 left-4 z-10">
+                      <span className="px-3 py-1.5 bg-accent text-white text-sm font-medium rounded-full shadow-lg">
+                        AI Visualization
+                      </span>
+                    </div>
+                    <img
+                      src={state.renderedImage}
+                      alt="Your redesigned space"
+                      className="w-full rounded-2xl shadow-lg"
+                    />
+                    <p className="text-center text-sm text-ink/60 mt-3">
+                      AI-generated preview of your redesigned space
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-lg font-semibold text-ink mb-3">Your space with product pins</h3>
+                    <InteractivePhotoOverlay
+                      photoUrl={state.photo}
+                      items={state.designRecommendation.items}
+                      onItemClick={handlePinClick}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* If we have rendered image, also show interactive overlay */}
+              {state.renderedImage && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-ink mb-3">Original photo with product locations</h3>
+                  <InteractivePhotoOverlay
+                    photoUrl={state.photo}
+                    items={state.designRecommendation.items}
+                    onItemClick={handlePinClick}
+                  />
+                </div>
+              )}
+
               {/* Design suggestion */}
               <DesignSuggestion recommendation={state.designRecommendation} />
 
               {/* Products section */}
-              <div className="mt-12">
+              <div className="mt-12" ref={productSectionRef}>
                 <h2 className="font-display text-xl font-semibold text-ink mb-6 text-center">
                   Shop the look
                 </h2>
@@ -137,8 +237,17 @@ export function ResultsPage() {
                 )}
               </div>
 
-              {/* Start over button */}
-              <div className="mt-12 text-center">
+              {/* Action buttons */}
+              <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button
+                  onClick={handleTryDifferentStyle}
+                  className="px-6 py-3 bg-white border-2 border-accent text-accent rounded-full font-semibold hover:bg-accent-light/20 transition-all flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Try different style
+                </button>
                 <button
                   onClick={handleStartOver}
                   className="px-8 py-3 bg-ink text-cream rounded-full font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all"

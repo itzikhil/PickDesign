@@ -10,6 +10,8 @@ Rules:
 - Suggest specific, searchable product types (not vague descriptions)
 - Include wall color if relevant
 - The search_query should be optimized for finding products on Amazon.de or German furniture stores
+- Include realistic EUR price ranges for each item
+- Include position_hint as x,y percentages (0-100) indicating where the item would be placed in the photo
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
 {
@@ -23,7 +25,9 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text, no
       "max_height_cm": 180,
       "color": "white or light oak",
       "placement": "Against left wall, flush with corner",
-      "priority": "essential"
+      "priority": "essential",
+      "price_range_eur": { "min": 45, "max": 89 },
+      "position_hint": { "x": 20, "y": 50 }
     }
   ],
   "wall_color": {
@@ -78,6 +82,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       over_500: '€500+',
     };
 
+    // Handle both single-select (legacy) and multi-select preferences
+    const spaceTypes = preferences.spaceTypes?.length > 0
+      ? preferences.spaceTypes.join(', ')
+      : preferences.spaceType || 'Not specified';
+
+    const goals = preferences.goals?.length > 0
+      ? preferences.goals.join(', ')
+      : preferences.goal || 'Not specified';
+
+    const styles = preferences.styles?.length > 0
+      ? preferences.styles.join(', ')
+      : preferences.style || 'Not specified';
+
     const contextText = `
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
@@ -89,9 +106,9 @@ Measurements:
 ${measurementsText || 'None provided'}
 
 User Preferences:
-- Space type: ${preferences.spaceType || 'Not specified'}
-- Goal: ${preferences.goal || 'Not specified'}
-- Style: ${preferences.style || 'Not specified'}
+- Space type(s): ${spaceTypes}
+- Goal(s): ${goals}
+- Style(s): ${styles}
 - Budget: ${preferences.budget ? budgetMap[preferences.budget] : 'Not specified'}
 - Special needs: ${preferences.specialNeeds?.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
 `;

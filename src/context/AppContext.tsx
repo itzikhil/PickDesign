@@ -14,9 +14,9 @@ import type {
 } from '../lib/types';
 
 const initialPreferences: UserPreferences = {
-  spaceType: null,
-  goal: null,
-  style: null,
+  spaceTypes: [],
+  goals: [],
+  styles: [],
   budget: null,
   specialNeeds: [],
 };
@@ -31,6 +31,8 @@ const initialState: AppState = {
   isGeneratingDesign: false,
   productMatches: [],
   isLoadingProducts: false,
+  renderedImage: null,
+  isRenderingImage: false,
 };
 
 type Action =
@@ -39,16 +41,23 @@ type Action =
   | { type: 'SET_SPACE_ANALYSIS'; payload: SpaceAnalysis }
   | { type: 'SET_MEASUREMENTS'; payload: Measurement[] }
   | { type: 'UPDATE_MEASUREMENT'; payload: { id: string; value: number | null } }
-  | { type: 'SET_SPACE_TYPE'; payload: SpaceType }
-  | { type: 'SET_GOAL'; payload: Goal }
-  | { type: 'SET_STYLE'; payload: StylePreference }
+  | { type: 'TOGGLE_SPACE_TYPE'; payload: SpaceType }
+  | { type: 'TOGGLE_GOAL'; payload: Goal }
+  | { type: 'TOGGLE_STYLE'; payload: StylePreference }
   | { type: 'SET_BUDGET'; payload: BudgetRange }
   | { type: 'TOGGLE_SPECIAL_NEED'; payload: SpecialNeed }
   | { type: 'SET_GENERATING_DESIGN'; payload: boolean }
   | { type: 'SET_DESIGN_RECOMMENDATION'; payload: DesignRecommendation }
   | { type: 'SET_LOADING_PRODUCTS'; payload: boolean }
   | { type: 'SET_PRODUCT_MATCHES'; payload: ProductMatch[] }
+  | { type: 'SET_RENDERING_IMAGE'; payload: boolean }
+  | { type: 'SET_RENDERED_IMAGE'; payload: string | null }
+  | { type: 'CLEAR_DESIGN' }
   | { type: 'RESET' };
+
+function toggleArrayItem<T>(arr: T[], item: T): T[] {
+  return arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item];
+}
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -75,20 +84,42 @@ function reducer(state: AppState, action: Action): AppState {
           m.id === action.payload.id ? { ...m, value: action.payload.value } : m
         ),
       };
-    case 'SET_SPACE_TYPE':
+    case 'TOGGLE_SPACE_TYPE':
       return {
         ...state,
-        preferences: { ...state.preferences, spaceType: action.payload },
+        preferences: {
+          ...state.preferences,
+          spaceTypes: toggleArrayItem(state.preferences.spaceTypes, action.payload),
+        },
       };
-    case 'SET_GOAL':
+    case 'TOGGLE_GOAL':
       return {
         ...state,
-        preferences: { ...state.preferences, goal: action.payload },
+        preferences: {
+          ...state.preferences,
+          goals: toggleArrayItem(state.preferences.goals, action.payload),
+        },
       };
-    case 'SET_STYLE':
+    case 'TOGGLE_STYLE':
+      // If selecting 'no_preference', clear others; if selecting others, remove 'no_preference'
+      if (action.payload === 'no_preference') {
+        return {
+          ...state,
+          preferences: {
+            ...state.preferences,
+            styles: state.preferences.styles.includes('no_preference') ? [] : ['no_preference'],
+          },
+        };
+      }
       return {
         ...state,
-        preferences: { ...state.preferences, style: action.payload },
+        preferences: {
+          ...state.preferences,
+          styles: toggleArrayItem(
+            state.preferences.styles.filter((s) => s !== 'no_preference'),
+            action.payload
+          ),
+        },
       };
     case 'SET_BUDGET':
       return {
@@ -96,20 +127,25 @@ function reducer(state: AppState, action: Action): AppState {
         preferences: { ...state.preferences, budget: action.payload },
       };
     case 'TOGGLE_SPECIAL_NEED':
-      const needs = state.preferences.specialNeeds;
-      const newNeeds = needs.includes(action.payload)
-        ? needs.filter((n) => n !== action.payload)
-        : [...needs.filter((n) => n !== 'none'), action.payload];
       // If 'none' is selected, clear all others
       if (action.payload === 'none') {
         return {
           ...state,
-          preferences: { ...state.preferences, specialNeeds: ['none'] },
+          preferences: {
+            ...state.preferences,
+            specialNeeds: state.preferences.specialNeeds.includes('none') ? [] : ['none'],
+          },
         };
       }
       return {
         ...state,
-        preferences: { ...state.preferences, specialNeeds: newNeeds },
+        preferences: {
+          ...state.preferences,
+          specialNeeds: toggleArrayItem(
+            state.preferences.specialNeeds.filter((n) => n !== 'none'),
+            action.payload
+          ),
+        },
       };
     case 'SET_GENERATING_DESIGN':
       return { ...state, isGeneratingDesign: action.payload };
@@ -119,6 +155,17 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, isLoadingProducts: action.payload };
     case 'SET_PRODUCT_MATCHES':
       return { ...state, productMatches: action.payload };
+    case 'SET_RENDERING_IMAGE':
+      return { ...state, isRenderingImage: action.payload };
+    case 'SET_RENDERED_IMAGE':
+      return { ...state, renderedImage: action.payload };
+    case 'CLEAR_DESIGN':
+      return {
+        ...state,
+        designRecommendation: null,
+        productMatches: [],
+        renderedImage: null,
+      };
     case 'RESET':
       return initialState;
     default:

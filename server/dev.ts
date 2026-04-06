@@ -47,6 +47,8 @@ Rules:
 - Suggest specific, searchable product types (not vague descriptions)
 - Include wall color if relevant
 - The search_query should be optimized for finding products on Amazon.de or German furniture stores
+- Include realistic EUR price ranges for each item
+- Include position_hint as x,y percentages (0-100) indicating where the item would be placed in the photo
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
 {
@@ -60,7 +62,9 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text, no
       "max_height_cm": 180,
       "color": "white or light oak",
       "placement": "Against left wall, flush with corner",
-      "priority": "essential"
+      "priority": "essential",
+      "price_range_eur": { "min": 45, "max": 89 },
+      "position_hint": { "x": 20, "y": 50 }
     }
   ],
   "wall_color": {
@@ -72,13 +76,13 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text, no
 }`;
 
 // Helper to get Gemini client
-function getGeminiModel() {
+function getGeminiModel(modelName = 'gemini-2.5-flash') {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY not configured');
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  return genAI.getGenerativeModel({ model: modelName });
 }
 
 // API: Analyze space
@@ -183,6 +187,19 @@ app.post('/api/recommend', async (req, res) => {
       over_500: '€500+',
     };
 
+    // Handle both single-select (legacy) and multi-select preferences
+    const spaceTypes = preferences.spaceTypes?.length > 0
+      ? preferences.spaceTypes.join(', ')
+      : preferences.spaceType || 'Not specified';
+
+    const goals = preferences.goals?.length > 0
+      ? preferences.goals.join(', ')
+      : preferences.goal || 'Not specified';
+
+    const styles = preferences.styles?.length > 0
+      ? preferences.styles.join(', ')
+      : preferences.style || 'Not specified';
+
     const contextText = `
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
@@ -194,9 +211,9 @@ Measurements:
 ${measurementsText || 'None provided'}
 
 User Preferences:
-- Space type: ${preferences.spaceType || 'Not specified'}
-- Goal: ${preferences.goal || 'Not specified'}
-- Style: ${preferences.style || 'Not specified'}
+- Space type(s): ${spaceTypes}
+- Goal(s): ${goals}
+- Style(s): ${styles}
 - Budget: ${preferences.budget ? budgetMap[preferences.budget] : 'Not specified'}
 - Special needs: ${preferences.specialNeeds?.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
 `;
@@ -244,6 +261,94 @@ User Preferences:
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Recommend error:', error);
+    res.status(500).json({ error: message });
+  }
+});
+
+// API: Render design visualization
+app.post('/api/render', async (req, res) => {
+  try {
+    const { photo, recommendation } = req.body;
+
+    if (!photo) {
+      return res.status(400).json({ error: 'Missing required field: photo' });
+    }
+    if (!recommendation) {
+      return res.status(400).json({ error: 'Missing required field: recommendation' });
+    }
+
+    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+    const mediaTypeMatch = photo.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
+
+    // Build the redesign prompt
+    const itemDescriptions = recommendation.items
+      .map((item: { type: string; color: string; placement: string }) =>
+        `- ${item.type} (${item.color}) ${item.placement}`
+      )
+      .join('\n');
+
+    const wallColorText = recommendation.wall_color
+      ? `Wall color: ${recommendation.wall_color.name} (${recommendation.wall_color.hex})`
+      : '';
+
+    const prompt = `Edit this interior space photo to show a redesigned version with the following furniture and decor:
+
+${itemDescriptions}
+
+${wallColorText}
+
+Design concept: ${recommendation.concept}
+
+Create a photorealistic interior design render that naturally incorporates these items into the existing space. Keep the room structure and lighting similar, but add the suggested furniture and decor. Make it look like a professional interior design visualization.`;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        responseModalities: ['image', 'text'],
+      } as Record<string, unknown>,
+    });
+
+    let result;
+    try {
+      result = await model.generateContent([
+        { inlineData: { mimeType, data: base64Data } },
+        { text: prompt },
+      ]);
+    } catch (geminiError) {
+      const message = geminiError instanceof Error ? geminiError.message : String(geminiError);
+      console.error('Gemini image generation error:', geminiError);
+      return res.status(500).json({ error: `Gemini API error: ${message}` });
+    }
+
+    const response = result.response;
+
+    // Check for image in response
+    const imagePart = response.candidates?.[0]?.content?.parts?.find(
+      (part: Record<string, unknown>) => part.inlineData
+    );
+
+    if (imagePart && imagePart.inlineData) {
+      const imageData = imagePart.inlineData as { mimeType: string; data: string };
+      return res.status(200).json({
+        image: `data:${imageData.mimeType};base64,${imageData.data}`,
+      });
+    }
+
+    // If no image was generated, return an error
+    return res.status(500).json({
+      error: 'Image generation not available',
+      message: 'The model did not return an image. This feature may not be available in your region or plan.'
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Render error:', error);
     res.status(500).json({ error: message });
   }
 });
