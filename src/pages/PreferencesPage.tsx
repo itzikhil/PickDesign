@@ -36,10 +36,10 @@ export function PreferencesPage() {
           {/* Page title */}
           <div className="text-center mb-8">
             <h1 className="font-display text-2xl font-bold text-ink mb-2">
-              Tell us about your preferences
+              Your style
             </h1>
             <p className="text-ink/70">
-              Help us create the perfect design for your space
+              Tell us what you love
             </p>
           </div>
 

@@ -48,7 +48,7 @@ export function DesignSuggestion({ recommendation }: DesignSuggestionProps) {
 
       {/* Concept overview */}
       <div className="bg-white rounded-2xl p-6 border border-warm mb-6">
-        <h3 className="text-lg font-semibold text-ink mb-2">Design Concept</h3>
+        <h3 className="font-display text-lg font-semibold text-ink mb-2">The vision</h3>
         <p className="text-ink/80 leading-relaxed">{recommendation.concept}</p>
 
         {recommendation.styling_tip && (
@@ -64,7 +64,7 @@ export function DesignSuggestion({ recommendation }: DesignSuggestionProps) {
       {/* Wall color suggestion */}
       {recommendation.wall_color && (
         <div className="bg-white rounded-2xl p-6 border border-warm mb-6">
-          <h3 className="text-lg font-semibold text-ink mb-3">Suggested Wall Color</h3>
+          <h3 className="font-display text-lg font-semibold text-ink mb-3">Wall color</h3>
           <div className="flex items-start gap-4">
             <div
               className="w-20 h-20 rounded-xl shadow-inner border border-black/10 flex-shrink-0"
@@ -97,8 +97,8 @@ export function DesignSuggestion({ recommendation }: DesignSuggestionProps) {
 
       {/* Item recommendations summary */}
       <div className="bg-white rounded-2xl p-6 border border-warm">
-        <h3 className="text-lg font-semibold text-ink mb-4">
-          Recommended Items ({recommendation.items.length})
+        <h3 className="font-display text-lg font-semibold text-ink mb-4">
+          What you'll need
         </h3>
         <div className="space-y-4">
           {recommendation.items.map((item, index) => (

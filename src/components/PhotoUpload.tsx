@@ -44,19 +44,18 @@ export function PhotoUpload({ onPhotoSelected }: PhotoUploadProps) {
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto">
+    <div className="w-full">
       <div
         onClick={() => fileInputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={`
-          relative cursor-pointer rounded-2xl border-2 border-dashed p-12
-          transition-all duration-200 text-center
-          ${isDragging
-            ? 'border-accent bg-accent-light/30 scale-[1.02]'
-            : 'border-warm hover:border-accent hover:bg-accent-light/10'
-          }
+          relative cursor-pointer min-h-[60vh] md:min-h-[70vh]
+          flex flex-col items-center justify-center
+          bg-gradient-to-b from-warm/30 to-cream
+          transition-all duration-300
+          ${isDragging ? 'bg-accent-light/40 scale-[1.01]' : 'hover:bg-warm/40'}
         `}
       >
         <input
@@ -68,10 +67,21 @@ export function PhotoUpload({ onPhotoSelected }: PhotoUploadProps) {
           className="hidden"
         />
 
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-accent-light flex items-center justify-center">
+        <div className="flex flex-col items-center gap-8">
+          {/* Large tap target */}
+          <div
+            className={`
+              w-24 h-24 md:w-32 md:h-32 rounded-full
+              flex items-center justify-center
+              transition-all duration-300
+              ${isDragging
+                ? 'bg-accent text-white scale-110'
+                : 'bg-white shadow-lg hover:shadow-xl hover:scale-105 border border-warm'
+              }
+            `}
+          >
             <svg
-              className="w-8 h-8 text-accent"
+              className={`w-10 h-10 md:w-12 md:h-12 ${isDragging ? 'text-white' : 'text-accent'}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -79,41 +89,23 @@ export function PhotoUpload({ onPhotoSelected }: PhotoUploadProps) {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                strokeWidth={1.5}
+                d="M12 4v16m8-8H4"
               />
             </svg>
           </div>
 
-          <div>
-            <p className="text-lg font-semibold text-ink">
-              Take or upload a photo
+          {/* Minimal text */}
+          <div className="text-center">
+            <p className="font-display text-2xl md:text-3xl font-semibold text-ink">
+              Photograph your space
             </p>
-            <p className="text-sm text-ink/60 mt-1">
-              Snap a corner, wall, or any space you want to design
+            <p className="text-ink/50 mt-2 text-sm">
+              or drag and drop an image
             </p>
-          </div>
-
-          <div className="flex gap-3 mt-2">
-            <span className="px-3 py-1.5 bg-white rounded-full text-sm font-medium text-ink border border-warm">
-              Camera
-            </span>
-            <span className="px-3 py-1.5 bg-white rounded-full text-sm font-medium text-ink border border-warm">
-              Gallery
-            </span>
           </div>
         </div>
       </div>
-
-      <p className="text-center text-xs text-ink/50 mt-4">
-        Your photo is processed securely and never stored
-      </p>
     </div>
   );
 }

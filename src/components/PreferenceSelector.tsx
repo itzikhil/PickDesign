@@ -50,7 +50,7 @@ function ChipButton<T extends string>({
     <button
       onClick={() => onClick(value)}
       className={`
-        px-4 py-2.5 rounded-full font-medium text-sm transition-all
+        px-5 py-3 rounded-full font-medium transition-all
         flex items-center gap-2
         ${selected
           ? 'bg-accent text-white shadow-md'
@@ -81,14 +81,14 @@ function IntentCard({ value, label, description, selected, onClick }: IntentCard
     <button
       onClick={() => onClick(value)}
       className={`
-        w-full p-4 rounded-xl text-left transition-all
+        w-full p-5 rounded-2xl text-left transition-all
         ${selected
           ? 'bg-accent text-white shadow-lg ring-2 ring-accent ring-offset-2'
           : 'bg-white border border-warm hover:border-accent hover:shadow-md'
         }
       `}
     >
-      <p className={`font-semibold text-lg ${selected ? 'text-white' : 'text-ink'}`}>
+      <p className={`font-display text-xl font-semibold ${selected ? 'text-white' : 'text-ink'}`}>
         {label}
       </p>
       <p className={`text-sm mt-1 ${selected ? 'text-white/80' : 'text-ink/60'}`}>
@@ -98,28 +98,71 @@ function IntentCard({ value, label, description, selected, onClick }: IntentCard
   );
 }
 
+// Style card backgrounds (gradients as placeholders for real images)
+const styleBackgrounds: Record<StylePreference, string> = {
+  scandinavian: 'bg-gradient-to-br from-gray-100 to-stone-200',
+  modern: 'bg-gradient-to-br from-slate-700 to-slate-900',
+  industrial: 'bg-gradient-to-br from-zinc-500 to-zinc-700',
+  bohemian: 'bg-gradient-to-br from-amber-200 to-orange-300',
+  classic: 'bg-gradient-to-br from-stone-200 to-stone-400',
+  no_preference: 'bg-gradient-to-br from-gray-300 to-gray-400',
+};
+
+interface StyleCardProps {
+  value: StylePreference;
+  label: string;
+  selected: boolean;
+  onClick: (value: StylePreference) => void;
+}
+
+function StyleCard({ value, label, selected, onClick }: StyleCardProps) {
+  const isLight = ['scandinavian', 'bohemian', 'classic', 'no_preference'].includes(value);
+
+  return (
+    <button
+      onClick={() => onClick(value)}
+      className={`
+        relative aspect-[4/3] rounded-2xl overflow-hidden transition-all
+        ${styleBackgrounds[value]}
+        ${selected
+          ? 'ring-4 ring-accent ring-offset-2 scale-[1.02] shadow-xl'
+          : 'hover:scale-[1.02] hover:shadow-lg'
+        }
+      `}
+    >
+      {/* Selected checkmark */}
+      {selected && (
+        <div className="absolute top-3 right-3 w-8 h-8 bg-accent rounded-full flex items-center justify-center shadow-lg">
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
+
+      {/* Label */}
+      <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+        <p className={`font-display text-lg font-semibold ${isLight ? 'text-white' : 'text-white'}`}>
+          {label}
+        </p>
+      </div>
+    </button>
+  );
+}
+
 interface QuestionSectionProps {
   title: string;
   subtitle?: string;
-  multiSelect?: boolean;
   children: React.ReactNode;
 }
 
-function QuestionSection({ title, subtitle, multiSelect, children }: QuestionSectionProps) {
+function QuestionSection({ title, subtitle, children }: QuestionSectionProps) {
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-2 mb-1">
-        <h3 className="text-lg font-semibold text-ink">{title}</h3>
-        {multiSelect && (
-          <span className="text-xs px-2 py-0.5 bg-sage-light text-sage rounded-full font-medium">
-            Multi-select
-          </span>
-        )}
-      </div>
+    <div className="mb-10">
+      <h3 className="font-display text-xl font-semibold text-ink mb-1">{title}</h3>
       {subtitle && (
-        <p className="text-sm text-ink/60 mb-3">{subtitle}</p>
+        <p className="text-sm text-ink/60 mb-4">{subtitle}</p>
       )}
-      <div className="flex flex-wrap gap-2">{children}</div>
+      <div className="flex flex-wrap gap-3">{children}</div>
     </div>
   );
 }
@@ -145,11 +188,11 @@ export function PreferenceSelector({
     <div className="w-full max-w-2xl mx-auto">
       {/* Design Intent - First question */}
       <div className="mb-10">
-        <h3 className="text-xl font-semibold text-ink mb-2">
-          What would you like to do with this space?
+        <h3 className="font-display text-2xl font-semibold text-ink mb-2">
+          What would you like to do?
         </h3>
-        <p className="text-sm text-ink/60 mb-4">
-          This helps us tailor the design approach
+        <p className="text-sm text-ink/60 mb-5">
+          Choose how we should approach your space
         </p>
         <div className="space-y-3">
           {DESIGN_INTENTS.map((option) => (
@@ -168,7 +211,6 @@ export function PreferenceSelector({
       <QuestionSection
         title="What type of space is this?"
         subtitle="Select all that apply"
-        multiSelect
       >
         {SPACE_TYPES.map((option) => (
           <ChipButton
@@ -185,7 +227,6 @@ export function PreferenceSelector({
       <QuestionSection
         title="What are your goals?"
         subtitle="Select all that apply"
-        multiSelect
       >
         {GOALS.map((option) => (
           <ChipButton
@@ -199,22 +240,26 @@ export function PreferenceSelector({
         ))}
       </QuestionSection>
 
-      <QuestionSection
-        title="What styles do you like?"
-        subtitle="Mix and match styles"
-        multiSelect
-      >
-        {STYLES.map((option) => (
-          <ChipButton
-            key={option.value}
-            value={option.value}
-            label={option.label}
-            selected={styles.includes(option.value)}
-            onClick={onStyleToggle}
-            multiSelect
-          />
-        ))}
-      </QuestionSection>
+      {/* Style Selection - Visual Cards */}
+      <div className="mb-10">
+        <h3 className="font-display text-xl font-semibold text-ink mb-1">
+          What's your style?
+        </h3>
+        <p className="text-sm text-ink/60 mb-5">
+          Mix and match to create your look
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {STYLES.map((option) => (
+            <StyleCard
+              key={option.value}
+              value={option.value}
+              label={option.label}
+              selected={styles.includes(option.value)}
+              onClick={onStyleToggle}
+            />
+          ))}
+        </div>
+      </div>
 
       <QuestionSection title="What's your budget?" subtitle="For all items combined">
         {BUDGETS.map((option) => (
@@ -228,7 +273,7 @@ export function PreferenceSelector({
         ))}
       </QuestionSection>
 
-      <QuestionSection title="Any special requirements?" subtitle="Select all that apply" multiSelect>
+      <QuestionSection title="Any special requirements?" subtitle="Optional">
         {SPECIAL_NEEDS.map((option) => (
           <ChipButton
             key={option.value}
@@ -245,14 +290,14 @@ export function PreferenceSelector({
         onClick={onComplete}
         disabled={!isComplete}
         className={`
-          w-full mt-4 py-4 px-6 rounded-full font-semibold text-lg transition-all
+          w-full mt-6 py-4 px-6 rounded-full font-semibold text-lg transition-all
           ${isComplete
-            ? 'bg-accent text-white hover:shadow-lg hover:-translate-y-0.5'
+            ? 'bg-ink text-cream hover:shadow-lg hover:-translate-y-0.5'
             : 'bg-warm text-ink/40 cursor-not-allowed'
           }
         `}
       >
-        {isComplete ? 'Generate Design' : 'Complete all sections to continue'}
+        {isComplete ? 'Create My Design' : 'Complete all sections'}
       </button>
     </div>
   );

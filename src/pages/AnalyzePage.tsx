@@ -63,20 +63,20 @@ export function AnalyzePage() {
           {/* Page title */}
           <div className="text-center mb-8">
             <h1 className="font-display text-2xl font-bold text-ink mb-2">
-              {state.isAnalyzing ? 'Analyzing your space...' : 'Add measurements'}
+              {state.isAnalyzing ? 'Understanding your space' : 'Add measurements'}
             </h1>
             <p className="text-ink/70">
               {state.isAnalyzing
-                ? 'Our AI is identifying the key areas to measure'
-                : 'Enter the dimensions for each highlighted area'}
+                ? 'Identifying key areas to measure...'
+                : 'Enter the dimensions for accurate recommendations'}
             </p>
           </div>
 
           {/* Content */}
           {state.isAnalyzing ? (
             <LoadingSpinner
-              message="Analyzing your space"
-              submessage="This usually takes 5-10 seconds"
+              message="Looking at your space"
+              submessage="Just a moment..."
             />
           ) : state.spaceAnalysis ? (
             <>

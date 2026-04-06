@@ -5,6 +5,7 @@ interface BeforeAfterSliderProps {
   afterImage: string;
   beforeLabel?: string;
   afterLabel?: string;
+  fullWidth?: boolean;
 }
 
 export function BeforeAfterSlider({
@@ -12,6 +13,7 @@ export function BeforeAfterSlider({
   afterImage,
   beforeLabel = 'Before',
   afterLabel = 'After',
+  fullWidth = true,
 }: BeforeAfterSliderProps) {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
@@ -63,11 +65,13 @@ export function BeforeAfterSlider({
   };
 
   return (
-    <div className="relative w-full">
+    <div className={`relative ${fullWidth ? '-mx-4 md:-mx-8' : 'w-full'}`}>
       {/* Main container */}
       <div
         ref={containerRef}
-        className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden cursor-ew-resize select-none"
+        className={`relative w-full aspect-[16/10] md:aspect-[16/9] overflow-hidden cursor-ew-resize select-none ${
+          fullWidth ? '' : 'rounded-2xl'
+        }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -100,13 +104,13 @@ export function BeforeAfterSlider({
 
         {/* Slider line */}
         <div
-          className="absolute top-0 bottom-0 w-1 bg-white shadow-lg z-10"
+          className="absolute top-0 bottom-0 w-0.5 bg-white/90 shadow-lg z-10"
           style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
         >
           {/* Slider handle */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-white/50">
             <svg
-              className="w-5 h-5 text-ink"
+              className="w-6 h-6 text-ink"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -121,22 +125,22 @@ export function BeforeAfterSlider({
           </div>
         </div>
 
-        {/* Labels */}
-        <div className="absolute top-4 left-4 z-10">
-          <span className="px-3 py-1.5 bg-ink/80 text-white text-sm font-medium rounded-full backdrop-blur-sm">
+        {/* Labels - bolder, more visible */}
+        <div className="absolute top-6 left-6 z-10">
+          <span className="px-4 py-2 bg-black/70 text-white text-sm font-semibold rounded-full backdrop-blur-sm">
             {beforeLabel}
           </span>
         </div>
-        <div className="absolute top-4 right-4 z-10">
-          <span className="px-3 py-1.5 bg-accent text-white text-sm font-medium rounded-full shadow-lg">
+        <div className="absolute top-6 right-6 z-10">
+          <span className="px-4 py-2 bg-accent text-white text-sm font-semibold rounded-full shadow-lg">
             {afterLabel}
           </span>
         </div>
       </div>
 
-      {/* Instructions */}
-      <p className="text-center text-sm text-ink/60 mt-3">
-        Drag the slider to compare before and after
+      {/* Instructions - subtle */}
+      <p className="text-center text-xs text-ink/40 mt-3 px-4">
+        Drag to compare
       </p>
     </div>
   );

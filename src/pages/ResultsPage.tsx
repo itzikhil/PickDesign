@@ -152,7 +152,7 @@ export function ResultsPage() {
           {state.isGeneratingDesign && (
             <LoadingSpinner
               message="Creating your design"
-              submessage="Our AI is crafting personalized recommendations..."
+              submessage="Curating the perfect pieces for your space..."
             />
           )}
 
@@ -161,11 +161,11 @@ export function ResultsPage() {
             <>
               {/* Page title */}
               <div className="text-center mb-8">
-                <h1 className="font-display text-2xl font-bold text-ink mb-2">
-                  Your personalized design
+                <h1 className="text-display-lg text-ink mb-2">
+                  Your new space
                 </h1>
                 <p className="text-ink/70">
-                  Tailored recommendations for your space
+                  Designed for you
                 </p>
               </div>
 
@@ -174,8 +174,8 @@ export function ResultsPage() {
                 {state.isRenderingImage ? (
                   <div className="bg-white rounded-2xl p-8 border border-warm">
                     <LoadingSpinner
-                      message="Generating visualization"
-                      submessage="Creating a preview of your redesigned space..."
+                      message="Creating preview"
+                      submessage="Bringing your new space to life..."
                     />
                   </div>
                 ) : state.renderedImage && state.renderType === 'redesign' ? (
@@ -226,8 +226,8 @@ export function ResultsPage() {
                         />
                       </div>
                     </div>
-                    <p className="text-center text-sm text-ink/60">
-                      Mood board showing the recommended items styled together
+                    <p className="text-center text-sm text-ink/50">
+                      Your inspiration board
                     </p>
                     {/* Product pins on original photo */}
                     <div>
@@ -260,15 +260,20 @@ export function ResultsPage() {
               <DesignSuggestion recommendation={state.designRecommendation} />
 
               {/* Products section */}
-              <div className="mt-12" ref={productSectionRef}>
-                <h2 className="font-display text-xl font-semibold text-ink mb-6 text-center">
-                  Shop the look
-                </h2>
+              <div className="mt-16" ref={productSectionRef}>
+                <div className="text-center mb-8">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-2">
+                    Curated for you
+                  </p>
+                  <h2 className="font-display text-2xl md:text-3xl font-semibold text-ink">
+                    Shop the look
+                  </h2>
+                </div>
 
                 {state.isLoadingProducts ? (
-                  <LoadingSpinner message="Finding products..." />
+                  <LoadingSpinner message="Finding perfect pieces..." />
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                     {state.productMatches.map((match, index) => (
                       <ProductCard
                         key={index}
@@ -282,6 +287,7 @@ export function ResultsPage() {
                           source: 'amazon',
                         }}
                         item={match.item}
+                        featured={index === 0}
                       />
                     ))}
                   </div>
@@ -289,21 +295,18 @@ export function ResultsPage() {
               </div>
 
               {/* Action buttons */}
-              <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="mt-16 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <button
                   onClick={handleTryDifferentStyle}
-                  className="px-6 py-3 bg-white border-2 border-accent text-accent rounded-full font-semibold hover:bg-accent-light/20 transition-all flex items-center gap-2"
+                  className="px-8 py-4 bg-white border border-warm text-ink rounded-full font-semibold hover:border-accent hover:shadow-md transition-all"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Try different style
+                  Try a different style
                 </button>
                 <button
                   onClick={handleStartOver}
-                  className="px-8 py-3 bg-ink text-cream rounded-full font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                  className="px-8 py-4 bg-ink text-cream rounded-full font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all"
                 >
-                  Design Another Space
+                  Design another space
                 </button>
               </div>
             </>
