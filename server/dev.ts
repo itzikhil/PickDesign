@@ -78,7 +78,7 @@ function getGeminiModel() {
     throw new Error('GEMINI_API_KEY not configured');
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' });
+  return genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 }
 
 // API: Analyze space
