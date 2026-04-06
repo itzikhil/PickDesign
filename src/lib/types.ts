@@ -110,6 +110,7 @@ export interface AppState {
 
   // Step 7: Rendered visualization
   renderedImage: string | null; // base64 data URL of AI-generated redesign
+  renderType: 'redesign' | 'moodboard' | null; // type of render generated
   isRenderingImage: boolean;
 }
 

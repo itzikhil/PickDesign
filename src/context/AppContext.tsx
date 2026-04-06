@@ -32,6 +32,7 @@ const initialState: AppState = {
   productMatches: [],
   isLoadingProducts: false,
   renderedImage: null,
+  renderType: null,
   isRenderingImage: false,
 };
 
@@ -51,7 +52,7 @@ type Action =
   | { type: 'SET_LOADING_PRODUCTS'; payload: boolean }
   | { type: 'SET_PRODUCT_MATCHES'; payload: ProductMatch[] }
   | { type: 'SET_RENDERING_IMAGE'; payload: boolean }
-  | { type: 'SET_RENDERED_IMAGE'; payload: string | null }
+  | { type: 'SET_RENDERED_IMAGE'; payload: { image: string | null; renderType: 'redesign' | 'moodboard' | null } }
   | { type: 'CLEAR_DESIGN' }
   | { type: 'RESET' };
 
@@ -158,13 +159,18 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_RENDERING_IMAGE':
       return { ...state, isRenderingImage: action.payload };
     case 'SET_RENDERED_IMAGE':
-      return { ...state, renderedImage: action.payload };
+      return {
+        ...state,
+        renderedImage: action.payload.image,
+        renderType: action.payload.renderType,
+      };
     case 'CLEAR_DESIGN':
       return {
         ...state,
         designRecommendation: null,
         productMatches: [],
         renderedImage: null,
+        renderType: null,
       };
     case 'RESET':
       return initialState;

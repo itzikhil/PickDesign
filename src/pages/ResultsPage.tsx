@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { DesignSuggestion } from '../components/DesignSuggestion';
 import { ProductCard } from '../components/ProductCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { InteractivePhotoOverlay } from '../components/InteractivePhotoOverlay';
 import { useApp } from '../context/AppContext';
 import { generateDesignRecommendation } from '../lib/claude';
@@ -13,7 +14,7 @@ import type { RecommendedItem } from '../lib/types';
 async function renderDesignVisualization(
   photo: string,
   recommendation: { concept: string; items: RecommendedItem[]; wall_color?: { name: string; hex: string } }
-): Promise<string | null> {
+): Promise<{ image: string | null; type: 'redesign' | 'moodboard' | null }> {
   try {
     const response = await fetch('/api/render', {
       method: 'POST',
@@ -23,14 +24,17 @@ async function renderDesignVisualization(
 
     if (!response.ok) {
       console.warn('Image rendering not available');
-      return null;
+      return { image: null, type: null };
     }
 
     const data = await response.json();
-    return data.image || null;
+    return {
+      image: data.image || null,
+      type: data.type || null,
+    };
   } catch (error) {
     console.warn('Image rendering failed:', error);
-    return null;
+    return { image: null, type: null };
   }
 }
 
@@ -74,8 +78,11 @@ export function ResultsPage() {
 
           // Try to generate visualization (non-blocking)
           dispatch({ type: 'SET_RENDERING_IMAGE', payload: true });
-          const renderedImage = await renderDesignVisualization(state.photo!, recommendation);
-          dispatch({ type: 'SET_RENDERED_IMAGE', payload: renderedImage });
+          const renderResult = await renderDesignVisualization(state.photo!, recommendation);
+          dispatch({
+            type: 'SET_RENDERED_IMAGE',
+            payload: { image: renderResult.image, renderType: renderResult.type },
+          });
           dispatch({ type: 'SET_RENDERING_IMAGE', payload: false });
         })
         .catch((error) => {
@@ -156,7 +163,7 @@ export function ResultsPage() {
                 </p>
               </div>
 
-              {/* Hero: Rendered visualization or original photo */}
+              {/* Hero: Before/After visualization */}
               <div className="mb-8">
                 {state.isRenderingImage ? (
                   <div className="bg-white rounded-2xl p-8 border border-warm">
@@ -165,25 +172,75 @@ export function ResultsPage() {
                       submessage="Creating a preview of your redesigned space..."
                     />
                   </div>
-                ) : state.renderedImage ? (
-                  <div className="relative">
-                    <div className="absolute top-4 left-4 z-10">
-                      <span className="px-3 py-1.5 bg-accent text-white text-sm font-medium rounded-full shadow-lg">
-                        AI Visualization
-                      </span>
-                    </div>
-                    <img
-                      src={state.renderedImage}
-                      alt="Your redesigned space"
-                      className="w-full rounded-2xl shadow-lg"
+                ) : state.renderedImage && state.renderType === 'redesign' ? (
+                  // Show before/after slider for redesign images
+                  <div>
+                    <BeforeAfterSlider
+                      beforeImage={state.photo}
+                      afterImage={state.renderedImage}
+                      beforeLabel="Before"
+                      afterLabel="After"
                     />
-                    <p className="text-center text-sm text-ink/60 mt-3">
-                      AI-generated preview of your redesigned space
+                    {/* Product pins on after image */}
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold text-ink mb-3">
+                        Click to explore products
+                      </h3>
+                      <InteractivePhotoOverlay
+                        photoUrl={state.renderedImage}
+                        items={state.designRecommendation.items}
+                        onItemClick={handlePinClick}
+                      />
+                    </div>
+                  </div>
+                ) : state.renderedImage && state.renderType === 'moodboard' ? (
+                  // Show mood board alongside original photo
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Original photo */}
+                      <div className="relative">
+                        <span className="absolute top-4 left-4 z-10 px-3 py-1.5 bg-ink/80 text-white text-sm font-medium rounded-full backdrop-blur-sm">
+                          Your Space
+                        </span>
+                        <img
+                          src={state.photo}
+                          alt="Your space"
+                          className="w-full rounded-2xl shadow-md"
+                        />
+                      </div>
+                      {/* Mood board */}
+                      <div className="relative">
+                        <span className="absolute top-4 left-4 z-10 px-3 py-1.5 bg-accent text-white text-sm font-medium rounded-full shadow-lg">
+                          Design Mood Board
+                        </span>
+                        <img
+                          src={state.renderedImage}
+                          alt="Design mood board"
+                          className="w-full rounded-2xl shadow-md"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-center text-sm text-ink/60">
+                      Mood board showing the recommended items styled together
                     </p>
+                    {/* Product pins on original photo */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-ink mb-3">
+                        Click to explore products in your space
+                      </h3>
+                      <InteractivePhotoOverlay
+                        photoUrl={state.photo}
+                        items={state.designRecommendation.items}
+                        onItemClick={handlePinClick}
+                      />
+                    </div>
                   </div>
                 ) : (
+                  // Fallback: just show original photo with pins
                   <div>
-                    <h3 className="text-lg font-semibold text-ink mb-3">Your space with product pins</h3>
+                    <h3 className="text-lg font-semibold text-ink mb-3">
+                      Your space with product recommendations
+                    </h3>
                     <InteractivePhotoOverlay
                       photoUrl={state.photo}
                       items={state.designRecommendation.items}
@@ -192,18 +249,6 @@ export function ResultsPage() {
                   </div>
                 )}
               </div>
-
-              {/* If we have rendered image, also show interactive overlay */}
-              {state.renderedImage && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-ink mb-3">Original photo with product locations</h3>
-                  <InteractivePhotoOverlay
-                    photoUrl={state.photo}
-                    items={state.designRecommendation.items}
-                    onItemClick={handlePinClick}
-                  />
-                </div>
-              )}
 
               {/* Design suggestion */}
               <DesignSuggestion recommendation={state.designRecommendation} />

@@ -265,6 +265,62 @@ User Preferences:
   }
 });
 
+// Helper functions for render prompts
+interface RenderItem {
+  type: string;
+  color: string;
+  placement: string;
+  max_width_cm?: number;
+  max_depth_cm?: number;
+  max_height_cm?: number;
+}
+
+interface RenderRecommendation {
+  concept: string;
+  items: RenderItem[];
+  wall_color?: { name: string; hex: string };
+}
+
+function buildDetailedPrompt(recommendation: RenderRecommendation): string {
+  const itemDescriptions = recommendation.items
+    .map((item) => {
+      const dimensions = item.max_width_cm
+        ? ` (approximately ${item.max_width_cm}x${item.max_depth_cm}x${item.max_height_cm}cm)`
+        : '';
+      return `${item.type} in ${item.color}${dimensions} ${item.placement}`;
+    })
+    .join(', ');
+
+  const wallColorText = recommendation.wall_color
+    ? `Wall color: ${recommendation.wall_color.name} (${recommendation.wall_color.hex}).`
+    : '';
+
+  return `Based on this room photo, create a photorealistic interior design visualization of the same space with the following items added: [${itemDescriptions}].
+
+Keep the same room structure, lighting, and perspective. ${wallColorText}
+
+Design concept: ${recommendation.concept}
+
+The result should look like a professional interior design rendering that could appear in an interior design magazine. Make the new furniture and decor look naturally integrated into the space, with realistic shadows and lighting that match the original photo.`;
+}
+
+function buildMoodBoardPrompt(recommendation: RenderRecommendation): string {
+  const itemList = recommendation.items
+    .map((item) => `${item.type} in ${item.color}`)
+    .join(', ');
+
+  const bgColor = recommendation.wall_color?.hex || '#F5F5F5';
+  const bgColorName = recommendation.wall_color?.name || 'neutral';
+
+  return `Create a professional interior design mood board showing these items arranged in a stylish flat-lay composition: ${itemList}.
+
+Use ${bgColorName} (${bgColor}) as the background color.
+
+Design concept: ${recommendation.concept}
+
+Style the mood board like a professional interior designer's presentation: clean, elegant, with items artfully arranged. Include subtle shadows for depth. The overall aesthetic should be sophisticated and aspirational, like something from an interior design Pinterest board or magazine.`;
+}
+
 // API: Render design visualization
 app.post('/api/render', async (req, res) => {
   try {
@@ -281,27 +337,6 @@ app.post('/api/render', async (req, res) => {
     const mediaTypeMatch = photo.match(/^data:(image\/\w+);base64,/);
     const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
 
-    // Build the redesign prompt
-    const itemDescriptions = recommendation.items
-      .map((item: { type: string; color: string; placement: string }) =>
-        `- ${item.type} (${item.color}) ${item.placement}`
-      )
-      .join('\n');
-
-    const wallColorText = recommendation.wall_color
-      ? `Wall color: ${recommendation.wall_color.name} (${recommendation.wall_color.hex})`
-      : '';
-
-    const prompt = `Edit this interior space photo to show a redesigned version with the following furniture and decor:
-
-${itemDescriptions}
-
-${wallColorText}
-
-Design concept: ${recommendation.concept}
-
-Create a photorealistic interior design render that naturally incorporates these items into the existing space. Keep the room structure and lighting similar, but add the suggested furniture and decor. Make it look like a professional interior design visualization.`;
-
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
@@ -311,40 +346,68 @@ Create a photorealistic interior design render that naturally incorporates these
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-exp',
       generationConfig: {
-        responseModalities: ['image', 'text'],
+        responseModalities: ['IMAGE', 'TEXT'],
       } as Record<string, unknown>,
     });
 
+    // First attempt: Image-to-image redesign
+    const redesignPrompt = buildDetailedPrompt(recommendation);
+
     let result;
+    let imageGenerated = false;
+
     try {
       result = await model.generateContent([
         { inlineData: { mimeType, data: base64Data } },
-        { text: prompt },
+        { text: redesignPrompt },
       ]);
-    } catch (geminiError) {
-      const message = geminiError instanceof Error ? geminiError.message : String(geminiError);
-      console.error('Gemini image generation error:', geminiError);
-      return res.status(500).json({ error: `Gemini API error: ${message}` });
+
+      const response = result.response;
+      const imagePart = response.candidates?.[0]?.content?.parts?.find(
+        (part: Record<string, unknown>) => part.inlineData
+      );
+
+      if (imagePart && imagePart.inlineData) {
+        const imageData = imagePart.inlineData as { mimeType: string; data: string };
+        return res.status(200).json({
+          image: `data:${imageData.mimeType};base64,${imageData.data}`,
+          type: 'redesign',
+        });
+      }
+    } catch (redesignError) {
+      console.warn('Image-to-image redesign failed, falling back to mood board:', redesignError);
     }
 
-    const response = result.response;
+    // Fallback: Generate a mood board instead
+    if (!imageGenerated) {
+      try {
+        const moodBoardPrompt = buildMoodBoardPrompt(recommendation);
 
-    // Check for image in response
-    const imagePart = response.candidates?.[0]?.content?.parts?.find(
-      (part: Record<string, unknown>) => part.inlineData
-    );
+        result = await model.generateContent([
+          { text: moodBoardPrompt },
+        ]);
 
-    if (imagePart && imagePart.inlineData) {
-      const imageData = imagePart.inlineData as { mimeType: string; data: string };
-      return res.status(200).json({
-        image: `data:${imageData.mimeType};base64,${imageData.data}`,
-      });
+        const response = result.response;
+        const imagePart = response.candidates?.[0]?.content?.parts?.find(
+          (part: Record<string, unknown>) => part.inlineData
+        );
+
+        if (imagePart && imagePart.inlineData) {
+          const imageData = imagePart.inlineData as { mimeType: string; data: string };
+          return res.status(200).json({
+            image: `data:${imageData.mimeType};base64,${imageData.data}`,
+            type: 'moodboard',
+          });
+        }
+      } catch (moodBoardError) {
+        console.error('Mood board generation also failed:', moodBoardError);
+      }
     }
 
-    // If no image was generated, return an error
+    // If both approaches failed
     return res.status(500).json({
       error: 'Image generation not available',
-      message: 'The model did not return an image. This feature may not be available in your region or plan.'
+      message: 'Could not generate visualization. This feature may not be available in your region or plan.'
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
