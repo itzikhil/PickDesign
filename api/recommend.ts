@@ -35,20 +35,29 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text, no
 }`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
   try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not configured' });
+    }
+
     const { photo, spaceAnalysis, measurements, preferences } = req.body;
 
-    if (!photo || !spaceAnalysis || !measurements || !preferences) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!photo) {
+      return res.status(400).json({ error: 'Missing required field: photo' });
+    }
+    if (!spaceAnalysis) {
+      return res.status(400).json({ error: 'Missing required field: spaceAnalysis' });
+    }
+    if (!measurements) {
+      return res.status(400).json({ error: 'Missing required field: measurements' });
+    }
+    if (!preferences) {
+      return res.status(400).json({ error: 'Missing required field: preferences' });
     }
 
     // Extract base64 data and media type
@@ -72,36 +81,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const contextText = `
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
-- Existing items: ${spaceAnalysis.existing_items.join(', ')}
-- Constraints: ${spaceAnalysis.constraints.join(', ')}
-- Lighting: ${spaceAnalysis.lighting}
+- Existing items: ${spaceAnalysis.existing_items?.join(', ') || 'None'}
+- Constraints: ${spaceAnalysis.constraints?.join(', ') || 'None'}
+- Lighting: ${spaceAnalysis.lighting || 'Not specified'}
 
 Measurements:
-${measurementsText}
+${measurementsText || 'None provided'}
 
 User Preferences:
 - Space type: ${preferences.spaceType || 'Not specified'}
 - Goal: ${preferences.goal || 'Not specified'}
 - Style: ${preferences.style || 'Not specified'}
 - Budget: ${preferences.budget ? budgetMap[preferences.budget] : 'Not specified'}
-- Special needs: ${preferences.specialNeeds.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
+- Special needs: ${preferences.specialNeeds?.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
 `;
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' });
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: base64Data,
+    let result;
+    try {
+      result = await model.generateContent([
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
         },
-      },
-      { text: `${DESIGN_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
-    ]);
+        { text: `${DESIGN_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
+      ]);
+    } catch (geminiError) {
+      const message = geminiError instanceof Error ? geminiError.message : String(geminiError);
+      console.error('Gemini API error:', geminiError);
+      return res.status(500).json({ error: `Gemini API error: ${message}` });
+    }
 
     const response = result.response;
     const text = response.text();
+
+    if (!text) {
+      return res.status(500).json({ error: 'Gemini returned empty response' });
+    }
 
     // Clean up response - remove markdown code blocks if present
     const cleanedText = text
@@ -109,10 +129,21 @@ User Preferences:
       .replace(/```\n?/g, '')
       .trim();
 
-    const recommendation = JSON.parse(cleanedText);
+    let recommendation;
+    try {
+      recommendation = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error('JSON parse error. Raw response:', text);
+      return res.status(500).json({
+        error: 'Failed to parse Gemini response as JSON',
+        rawResponse: cleanedText.substring(0, 500)
+      });
+    }
+
     return res.status(200).json(recommendation);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('Recommend error:', error);
-    return res.status(500).json({ error: 'Failed to generate recommendation' });
+    return res.status(500).json({ error: message });
   }
 }

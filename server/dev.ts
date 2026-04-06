@@ -87,27 +87,65 @@ app.post('/api/analyze', async (req, res) => {
     const { photo } = req.body;
 
     if (!photo) {
-      return res.status(400).json({ error: 'Photo is required' });
+      return res.status(400).json({ error: 'Photo is required in request body' });
+    }
+
+    if (typeof photo !== 'string') {
+      return res.status(400).json({ error: 'Photo must be a base64 data URL string' });
     }
 
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
     const mediaTypeMatch = photo.match(/^data:(image\/\w+);base64,/);
     const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
 
-    const model = getGeminiModel();
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64Data } },
-      { text: SPACE_ANALYSIS_PROMPT },
-    ]);
+    if (!base64Data) {
+      return res.status(400).json({ error: 'Invalid photo format - could not extract base64 data' });
+    }
+
+    let model;
+    try {
+      model = getGeminiModel();
+    } catch (configError) {
+      const message = configError instanceof Error ? configError.message : String(configError);
+      return res.status(500).json({ error: message });
+    }
+
+    let result;
+    try {
+      result = await model.generateContent([
+        { inlineData: { mimeType, data: base64Data } },
+        { text: SPACE_ANALYSIS_PROMPT },
+      ]);
+    } catch (geminiError) {
+      const message = geminiError instanceof Error ? geminiError.message : String(geminiError);
+      console.error('Gemini API error:', geminiError);
+      return res.status(500).json({ error: `Gemini API error: ${message}` });
+    }
 
     const text = result.response.text();
+
+    if (!text) {
+      return res.status(500).json({ error: 'Gemini returned empty response' });
+    }
+
     const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const analysis = JSON.parse(cleanedText);
+
+    let analysis;
+    try {
+      analysis = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error('JSON parse error. Raw response:', text);
+      return res.status(500).json({
+        error: 'Failed to parse Gemini response as JSON',
+        rawResponse: cleanedText.substring(0, 500)
+      });
+    }
 
     res.json(analysis);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('Analyze error:', error);
-    res.status(500).json({ error: 'Failed to analyze space' });
+    res.status(500).json({ error: message });
   }
 });
 
@@ -116,8 +154,17 @@ app.post('/api/recommend', async (req, res) => {
   try {
     const { photo, spaceAnalysis, measurements, preferences } = req.body;
 
-    if (!photo || !spaceAnalysis || !measurements || !preferences) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!photo) {
+      return res.status(400).json({ error: 'Missing required field: photo' });
+    }
+    if (!spaceAnalysis) {
+      return res.status(400).json({ error: 'Missing required field: spaceAnalysis' });
+    }
+    if (!measurements) {
+      return res.status(400).json({ error: 'Missing required field: measurements' });
+    }
+    if (!preferences) {
+      return res.status(400).json({ error: 'Missing required field: preferences' });
     }
 
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
@@ -139,35 +186,65 @@ app.post('/api/recommend', async (req, res) => {
     const contextText = `
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
-- Existing items: ${spaceAnalysis.existing_items.join(', ')}
-- Constraints: ${spaceAnalysis.constraints.join(', ')}
-- Lighting: ${spaceAnalysis.lighting}
+- Existing items: ${spaceAnalysis.existing_items?.join(', ') || 'None'}
+- Constraints: ${spaceAnalysis.constraints?.join(', ') || 'None'}
+- Lighting: ${spaceAnalysis.lighting || 'Not specified'}
 
 Measurements:
-${measurementsText}
+${measurementsText || 'None provided'}
 
 User Preferences:
 - Space type: ${preferences.spaceType || 'Not specified'}
 - Goal: ${preferences.goal || 'Not specified'}
 - Style: ${preferences.style || 'Not specified'}
 - Budget: ${preferences.budget ? budgetMap[preferences.budget] : 'Not specified'}
-- Special needs: ${preferences.specialNeeds.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
+- Special needs: ${preferences.specialNeeds?.length > 0 ? preferences.specialNeeds.join(', ') : 'None'}
 `;
 
-    const model = getGeminiModel();
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64Data } },
-      { text: `${DESIGN_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
-    ]);
+    let model;
+    try {
+      model = getGeminiModel();
+    } catch (configError) {
+      const message = configError instanceof Error ? configError.message : String(configError);
+      return res.status(500).json({ error: message });
+    }
+
+    let result;
+    try {
+      result = await model.generateContent([
+        { inlineData: { mimeType, data: base64Data } },
+        { text: `${DESIGN_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
+      ]);
+    } catch (geminiError) {
+      const message = geminiError instanceof Error ? geminiError.message : String(geminiError);
+      console.error('Gemini API error:', geminiError);
+      return res.status(500).json({ error: `Gemini API error: ${message}` });
+    }
 
     const text = result.response.text();
+
+    if (!text) {
+      return res.status(500).json({ error: 'Gemini returned empty response' });
+    }
+
     const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const recommendation = JSON.parse(cleanedText);
+
+    let recommendation;
+    try {
+      recommendation = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error('JSON parse error. Raw response:', text);
+      return res.status(500).json({
+        error: 'Failed to parse Gemini response as JSON',
+        rawResponse: cleanedText.substring(0, 500)
+      });
+    }
 
     res.json(recommendation);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('Recommend error:', error);
-    res.status(500).json({ error: 'Failed to generate recommendation' });
+    res.status(500).json({ error: message });
   }
 });
 
