@@ -2,6 +2,7 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI, Modality } from '@google/genai';
 
 // Load environment variables
 dotenv.config();
@@ -342,66 +343,75 @@ app.post('/api/render', async (req, res) => {
       return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
-      generationConfig: {
-        responseModalities: ['IMAGE', 'TEXT'],
-      } as Record<string, unknown>,
-    });
+    const ai = new GoogleGenAI({ apiKey });
 
     // First attempt: Image-to-image redesign
     const redesignPrompt = buildDetailedPrompt(recommendation);
 
-    let result;
-    let imageGenerated = false;
-
     try {
-      result = await model.generateContent([
-        { inlineData: { mimeType, data: base64Data } },
-        { text: redesignPrompt },
-      ]);
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash-exp-image-generation',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: redesignPrompt },
+            ],
+          },
+        ],
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+        },
+      });
 
-      const response = result.response;
-      const imagePart = response.candidates?.[0]?.content?.parts?.find(
-        (part: Record<string, unknown>) => part.inlineData
-      );
-
-      if (imagePart && imagePart.inlineData) {
-        const imageData = imagePart.inlineData as { mimeType: string; data: string };
-        return res.status(200).json({
-          image: `data:${imageData.mimeType};base64,${imageData.data}`,
-          type: 'redesign',
-        });
+      // Extract image from response
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const imageData = part.inlineData;
+            return res.status(200).json({
+              image: `data:${imageData.mimeType};base64,${imageData.data}`,
+              type: 'redesign',
+            });
+          }
+        }
       }
     } catch (redesignError) {
       console.warn('Image-to-image redesign failed, falling back to mood board:', redesignError);
     }
 
     // Fallback: Generate a mood board instead
-    if (!imageGenerated) {
-      try {
-        const moodBoardPrompt = buildMoodBoardPrompt(recommendation);
+    try {
+      const moodBoardPrompt = buildMoodBoardPrompt(recommendation);
 
-        result = await model.generateContent([
-          { text: moodBoardPrompt },
-        ]);
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash-exp-image-generation',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: moodBoardPrompt }],
+          },
+        ],
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+        },
+      });
 
-        const response = result.response;
-        const imagePart = response.candidates?.[0]?.content?.parts?.find(
-          (part: Record<string, unknown>) => part.inlineData
-        );
-
-        if (imagePart && imagePart.inlineData) {
-          const imageData = imagePart.inlineData as { mimeType: string; data: string };
-          return res.status(200).json({
-            image: `data:${imageData.mimeType};base64,${imageData.data}`,
-            type: 'moodboard',
-          });
+      // Extract image from response
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const imageData = part.inlineData;
+            return res.status(200).json({
+              image: `data:${imageData.mimeType};base64,${imageData.data}`,
+              type: 'moodboard',
+            });
+          }
         }
-      } catch (moodBoardError) {
-        console.error('Mood board generation also failed:', moodBoardError);
       }
+    } catch (moodBoardError) {
+      console.error('Mood board generation also failed:', moodBoardError);
     }
 
     // If both approaches failed
