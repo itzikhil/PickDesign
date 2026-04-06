@@ -1,9 +1,5 @@
 {
-  "functions": {
-    "api/*.ts": {
-      "region": "iad1"
-    }
-  },
+  "regions": ["iad1"],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/" }
