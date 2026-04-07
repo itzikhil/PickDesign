@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { MeasurementOverlay } from '../components/MeasurementOverlay';
@@ -9,6 +9,7 @@ import { analyzeSpace } from '../lib/claude';
 export function AnalyzePage() {
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const [showMeasurements, setShowMeasurements] = useState(false);
 
   // Redirect if no photo
   useEffect(() => {
@@ -41,6 +42,18 @@ export function AnalyzePage() {
     dispatch({ type: 'UPDATE_MEASUREMENT', payload: { id, value } });
   };
 
+  const handleContinueWithEstimates = () => {
+    // Use AI estimates for all surfaces
+    if (state.spaceAnalysis) {
+      state.spaceAnalysis.surfaces_to_measure.forEach((surface) => {
+        if (surface.estimated_cm) {
+          dispatch({ type: 'UPDATE_MEASUREMENT', payload: { id: surface.id, value: surface.estimated_cm } });
+        }
+      });
+    }
+    navigate('/preferences');
+  };
+
   const handleComplete = () => {
     navigate('/preferences');
   };
@@ -60,70 +73,95 @@ export function AnalyzePage() {
 
       <main className="pt-20 pb-12 px-4">
         <div className="max-w-2xl mx-auto">
-          {/* Page title */}
-          <div className="text-center mb-8">
-            <h1 className="font-display text-2xl font-bold text-ink mb-2">
-              {state.isAnalyzing ? 'Understanding your space' : 'Add measurements'}
-            </h1>
-            <p className="text-ink/70">
-              {state.isAnalyzing
-                ? 'Identifying key areas to measure...'
-                : 'Enter the dimensions for accurate recommendations'}
-            </p>
-          </div>
-
           {/* Content */}
           {state.isAnalyzing ? (
-            <LoadingSpinner
-              message="Looking at your space"
-              submessage="Just a moment..."
-            />
+            <>
+              <div className="text-center mb-8">
+                <h1 className="font-display text-2xl font-bold text-ink mb-2">
+                  Understanding your space
+                </h1>
+                <p className="text-ink/70">
+                  Just a moment...
+                </p>
+              </div>
+              <LoadingSpinner
+                message="Looking at your space"
+                submessage="Just a moment..."
+              />
+            </>
           ) : state.spaceAnalysis ? (
             <>
-              {/* Space analysis summary */}
-              <div className="bg-white rounded-2xl p-4 mb-6 border border-warm">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sage-light flex items-center justify-center flex-shrink-0">
-                    <svg
-                      className="w-5 h-5 text-sage"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-ink">
-                      Detected: {state.spaceAnalysis.space_type}
-                    </p>
-                    <p className="text-sm text-ink/70 mt-1">
-                      {state.spaceAnalysis.existing_items.length > 0 && (
-                        <>Existing items: {state.spaceAnalysis.existing_items.join(', ')}</>
-                      )}
-                    </p>
-                    {state.spaceAnalysis.constraints.length > 0 && (
-                      <p className="text-sm text-ink/60 mt-1">
-                        Constraints: {state.spaceAnalysis.constraints.join(', ')}
-                      </p>
-                    )}
-                  </div>
+              {/* Photo preview */}
+              <div className="relative rounded-2xl overflow-hidden mb-6">
+                <img
+                  src={state.photo}
+                  alt="Your space"
+                  className="w-full h-auto"
+                />
+                {/* Detected space badge */}
+                <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl px-4 py-2 shadow-lg">
+                  <p className="text-sm font-medium text-ink">
+                    {state.spaceAnalysis.space_type}
+                  </p>
                 </div>
               </div>
 
-              {/* Measurement overlay */}
-              <MeasurementOverlay
-                photoUrl={state.photo}
-                surfaces={state.spaceAnalysis.surfaces_to_measure}
-                measurements={state.measurements}
-                onUpdateMeasurement={handleUpdateMeasurement}
-                onComplete={handleComplete}
-              />
+              {/* Simplified flow - default skip */}
+              {!showMeasurements ? (
+                <div className="space-y-4">
+                  {/* Main CTA - continue with estimates */}
+                  <button
+                    onClick={handleContinueWithEstimates}
+                    className="w-full py-4 px-6 bg-teal text-white rounded-full font-semibold text-lg hover:bg-teal/90 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    Continue
+                  </button>
+
+                  <p className="text-center text-sm text-ink/60">
+                    We'll estimate dimensions from your photo
+                  </p>
+
+                  {/* Optional toggle for exact measurements */}
+                  <button
+                    onClick={() => setShowMeasurements(true)}
+                    className="w-full py-3 px-6 text-ink/70 hover:text-ink transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    I want to enter exact measurements
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Page title for measurement mode */}
+                  <div className="text-center mb-6">
+                    <h2 className="font-display text-xl font-semibold text-ink mb-1">
+                      Enter measurements
+                    </h2>
+                    <p className="text-sm text-ink/70">
+                      For more accurate recommendations
+                    </p>
+                  </div>
+
+                  {/* Measurement overlay */}
+                  <MeasurementOverlay
+                    photoUrl={state.photo}
+                    surfaces={state.spaceAnalysis.surfaces_to_measure}
+                    measurements={state.measurements}
+                    onUpdateMeasurement={handleUpdateMeasurement}
+                    onComplete={handleComplete}
+                  />
+
+                  {/* Back to skip option */}
+                  <button
+                    onClick={() => setShowMeasurements(false)}
+                    className="w-full mt-4 py-3 px-6 text-ink/60 hover:text-ink transition-colors text-sm"
+                  >
+                    ← Back to automatic estimation
+                  </button>
+                </>
+              )}
             </>
           ) : null}
         </div>

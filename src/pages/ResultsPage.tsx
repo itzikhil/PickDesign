@@ -1,15 +1,83 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { DesignSuggestion } from '../components/DesignSuggestion';
-import { ProductCard } from '../components/ProductCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { InteractivePhotoOverlay } from '../components/InteractivePhotoOverlay';
 import { useApp } from '../context/AppContext';
 import { generateDesignRecommendation } from '../lib/claude';
 import { matchProducts } from '../lib/products';
-import type { RecommendedItem, DesignIntent } from '../lib/types';
+import type { RecommendedItem, DesignIntent, ProductMatch } from '../lib/types';
+
+function getAmazonSearchUrl(query: string): string {
+  return `https://www.amazon.de/s?k=${encodeURIComponent(query)}&tag=pickdesign-21`;
+}
+
+function ShopItem({ match, index }: { match: ProductMatch; index: number }) {
+  const product = match.products[0];
+  const item = match.item;
+
+  const buyUrl = product?.affiliate_url || getAmazonSearchUrl(item.search_query);
+  const alternativesUrl = getAmazonSearchUrl(item.type);
+
+  const priceText = item.price_range_eur
+    ? `€${item.price_range_eur.min} – €${item.price_range_eur.max}`
+    : product?.price
+    ? `€${product.price}`
+    : null;
+
+  return (
+    <div className="flex items-start gap-4 py-4 border-b border-warm last:border-b-0">
+      {/* Number */}
+      <div className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center flex-shrink-0">
+        <span className="text-sm font-bold text-teal">{index + 1}</span>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            {/* Item name as buy link */}
+            <a
+              href={buyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-ink hover:text-teal transition-colors capitalize"
+            >
+              {item.type}
+              <svg className="inline-block w-4 h-4 ml-1 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+
+            {/* Description */}
+            <p className="text-sm text-ink/60 mt-0.5">
+              {item.color} · {item.max_width_cm}×{item.max_depth_cm}×{item.max_height_cm}cm
+            </p>
+
+            {/* See alternatives */}
+            <a
+              href={alternativesUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-teal hover:underline mt-1 inline-block"
+            >
+              See alternatives →
+            </a>
+          </div>
+
+          {/* Price */}
+          {priceText && (
+            <span className="text-sm font-medium text-ink/80 whitespace-nowrap">
+              {priceText}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 async function renderDesignVisualization(
   photo: string,
@@ -42,7 +110,6 @@ async function renderDesignVisualization(
 export function ResultsPage() {
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
-  const productSectionRef = useRef<HTMLDivElement>(null);
 
   // Redirect if missing required data
   useEffect(() => {
@@ -126,17 +193,6 @@ export function ResultsPage() {
     navigate('/');
   };
 
-  const handlePinClick = (_item: RecommendedItem, index: number) => {
-    // Scroll to the item in the design suggestion
-    const element = document.getElementById(`item-${index}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('ring-2', 'ring-accent');
-      setTimeout(() => {
-        element.classList.remove('ring-2', 'ring-accent');
-      }, 2000);
-    }
-  };
 
   if (!state.photo || !state.spaceAnalysis) {
     return null;
@@ -195,7 +251,6 @@ export function ResultsPage() {
                       <InteractivePhotoOverlay
                         photoUrl={state.renderedImage}
                         items={state.designRecommendation.items}
-                        onItemClick={handlePinClick}
                       />
                     </div>
                   </div>
@@ -237,7 +292,6 @@ export function ResultsPage() {
                       <InteractivePhotoOverlay
                         photoUrl={state.photo}
                         items={state.designRecommendation.items}
-                        onItemClick={handlePinClick}
                       />
                     </div>
                   </div>
@@ -250,7 +304,6 @@ export function ResultsPage() {
                     <InteractivePhotoOverlay
                       photoUrl={state.photo}
                       items={state.designRecommendation.items}
-                      onItemClick={handlePinClick}
                     />
                   </div>
                 )}
@@ -260,9 +313,9 @@ export function ResultsPage() {
               <DesignSuggestion recommendation={state.designRecommendation} />
 
               {/* Products section */}
-              <div className="mt-16" ref={productSectionRef}>
+              <div className="mt-16">
                 <div className="text-center mb-8">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-teal mb-2">
                     Curated for you
                   </p>
                   <h2 className="font-display text-2xl md:text-3xl font-semibold text-ink">
@@ -273,22 +326,9 @@ export function ResultsPage() {
                 {state.isLoadingProducts ? (
                   <LoadingSpinner message="Finding perfect pieces..." />
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  <div className="bg-white rounded-2xl border border-warm p-4 md:p-6">
                     {state.productMatches.map((match, index) => (
-                      <ProductCard
-                        key={index}
-                        product={match.products[0] || {
-                          id: `fallback-${index}`,
-                          name: match.item.type,
-                          price: 0,
-                          currency: 'EUR',
-                          image_url: '',
-                          affiliate_url: `https://www.amazon.de/s?k=${encodeURIComponent(match.item.search_query)}&tag=pickdesign-21`,
-                          source: 'amazon',
-                        }}
-                        item={match.item}
-                        featured={index === 0}
-                      />
+                      <ShopItem key={index} match={match} index={index} />
                     ))}
                   </div>
                 )}
