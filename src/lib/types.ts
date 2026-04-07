@@ -4,6 +4,7 @@ export interface SurfaceToMeasure {
   label: string;
   description: string;
   region: string;
+  estimated_cm?: number; // AI-estimated measurement
 }
 
 export interface SpaceAnalysis {

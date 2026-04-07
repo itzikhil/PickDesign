@@ -7,7 +7,7 @@ interface HeaderProps {
 
 export function Header({ showBack, onBack }: HeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-cream/85 backdrop-blur-md border-b border-black/5">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-md border-b border-gray/50">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
         {showBack ? (
           <button
@@ -24,7 +24,7 @@ export function Header({ showBack, onBack }: HeaderProps) {
         )}
 
         <Link to="/" className="font-display text-xl font-bold tracking-tight">
-          Pick<span className="text-accent">Design</span>
+          Pick<span className="text-teal">Design</span>
         </Link>
 
         <div className="w-16" /> {/* Spacer for centering */}

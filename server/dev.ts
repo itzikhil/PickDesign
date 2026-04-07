@@ -18,7 +18,7 @@ app.use(express.json({ limit: '50mb' }));
 const SPACE_ANALYSIS_PROMPT = `You are a spatial analysis assistant for interior design.
 Analyze the uploaded photo and identify:
 1. The type of space (corner, wall, alcove, shelf, full room)
-2. Key surfaces that need measuring
+2. The 2-3 MOST IMPORTANT surfaces to measure (no more than 3!)
 3. Existing furniture or fixtures
 4. Lighting conditions
 5. Any constraints (windows, doors, outlets, radiators)
@@ -27,15 +27,28 @@ Analyze the uploaded photo and identify:
    - "refresh" if the room is already organized but could use some finishing touches or additional items
    - "fill" if the room is mostly empty and needs furnishing
 
+IMPORTANT:
+- Only include 2-3 surfaces maximum - focus on the most critical dimensions
+- For each surface, estimate the measurement in centimeters based on typical room proportions and any visible reference objects
+- Your estimates don't need to be perfect - they help users know what to expect
+
 Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
 {
   "space_type": "corner",
   "surfaces_to_measure": [
     {
-      "id": "wall_left",
-      "label": "Left wall width",
-      "description": "Measure from the corner to the edge of the window",
-      "region": "left side of image, floor to ceiling"
+      "id": "wall_width",
+      "label": "Wall width",
+      "description": "The main wall where furniture will go",
+      "region": "back wall",
+      "estimated_cm": 180
+    },
+    {
+      "id": "available_depth",
+      "label": "Available depth",
+      "description": "Space from wall to where you'd walk",
+      "region": "floor area",
+      "estimated_cm": 120
     }
   ],
   "existing_items": ["radiator on right wall", "window"],

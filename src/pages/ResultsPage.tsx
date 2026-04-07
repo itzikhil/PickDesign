@@ -143,7 +143,7 @@ export function ResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-white">
       <Header showBack onBack={handleBack} />
 
       <main className="pt-20 pb-12 px-4">

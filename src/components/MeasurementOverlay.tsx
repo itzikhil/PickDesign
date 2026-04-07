@@ -23,13 +23,18 @@ export function MeasurementOverlay({
   const currentSurface = surfaces.find((s) => s.id === activeSurface);
   const currentMeasurement = measurements.find((m) => m.id === activeSurface);
 
-  const allMeasured = measurements.every((m) => m.value !== null && m.value > 0);
   const completedCount = measurements.filter((m) => m.value !== null && m.value > 0).length;
 
   const handleInputChange = (value: string) => {
     const numValue = value === '' ? null : parseFloat(value);
     if (activeSurface) {
       onUpdateMeasurement(activeSurface, numValue);
+    }
+  };
+
+  const useEstimate = () => {
+    if (activeSurface && currentSurface?.estimated_cm) {
+      onUpdateMeasurement(activeSurface, currentSurface.estimated_cm);
     }
   };
 
@@ -47,23 +52,26 @@ export function MeasurementOverlay({
     }
   };
 
+  // Can continue if at least one measurement is provided, or skip with estimates
+  const canContinue = measurements.some((m) => m.value !== null && m.value > 0);
+
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Progress indicator */}
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex-1 h-2 bg-warm rounded-full overflow-hidden">
+        <div className="flex-1 h-2 bg-gray rounded-full overflow-hidden">
           <div
-            className="h-full bg-accent transition-all duration-300"
+            className="h-full bg-teal transition-all duration-300"
             style={{ width: `${(completedCount / measurements.length) * 100}%` }}
           />
         </div>
-        <span className="text-sm text-ink/60">
+        <span className="text-sm text-gray-dark">
           {completedCount}/{measurements.length}
         </span>
       </div>
 
       {/* Photo with overlay */}
-      <div className="relative rounded-2xl overflow-hidden bg-ink/5">
+      <div className="relative rounded-2xl overflow-hidden bg-gray-light">
         <img
           src={photoUrl}
           alt="Space to measure"
@@ -73,8 +81,8 @@ export function MeasurementOverlay({
         {/* Measurement guide overlay */}
         {currentSurface && (
           <div className="absolute inset-0 bg-gradient-to-b from-ink/20 to-ink/40 flex items-center justify-center">
-            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 m-4 max-w-sm shadow-lg">
-              <p className="text-sm text-accent font-semibold mb-1">
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-5 m-4 max-w-sm shadow-lg">
+              <p className="text-sm text-teal font-semibold mb-1">
                 Measure this:
               </p>
               <p className="text-lg font-semibold text-ink">
@@ -83,21 +91,18 @@ export function MeasurementOverlay({
               <p className="text-sm text-ink/70 mt-1">
                 {currentSurface.description}
               </p>
-              <p className="text-xs text-ink/50 mt-2 italic">
-                Region: {currentSurface.region}
-              </p>
             </div>
           </div>
         )}
       </div>
 
       {/* Measurement input */}
-      <div className="mt-6 bg-white rounded-2xl p-6 border border-warm">
+      <div className="mt-6 bg-white rounded-2xl p-6 border border-gray">
         <div className="flex items-center gap-4">
           <button
             onClick={goToPrev}
             disabled={surfaces.findIndex((s) => s.id === activeSurface) === 0}
-            className="p-2 rounded-full hover:bg-cream disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 rounded-full hover:bg-gray-light disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -113,18 +118,31 @@ export function MeasurementOverlay({
                 type="number"
                 value={currentMeasurement?.value ?? ''}
                 onChange={(e) => handleInputChange(e.target.value)}
-                placeholder="0"
+                placeholder={currentSurface?.estimated_cm?.toString() || '0'}
                 min="1"
-                className="w-full text-3xl font-semibold text-center bg-cream rounded-xl p-4 border-2 border-transparent focus:border-accent focus:outline-none"
+                className="w-full text-3xl font-semibold text-center bg-gray-light rounded-xl p-4 border-2 border-transparent focus:border-teal focus:outline-none"
               />
               <span className="text-xl text-ink/60 font-medium">cm</span>
             </div>
+
+            {/* AI estimate button */}
+            {currentSurface?.estimated_cm && !currentMeasurement?.value && (
+              <button
+                onClick={useEstimate}
+                className="mt-3 w-full py-2.5 px-4 bg-teal-light text-teal rounded-lg font-medium text-sm hover:bg-teal hover:text-white transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Use estimate: ~{currentSurface.estimated_cm}cm
+              </button>
+            )}
           </div>
 
           <button
             onClick={goToNext}
             disabled={surfaces.findIndex((s) => s.id === activeSurface) === surfaces.length - 1}
-            className="p-2 rounded-full hover:bg-cream disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 rounded-full hover:bg-gray-light disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -146,7 +164,7 @@ export function MeasurementOverlay({
                 className={`
                   w-3 h-3 rounded-full transition-all
                   ${isActive ? 'scale-125' : ''}
-                  ${isComplete ? 'bg-sage' : isActive ? 'bg-accent' : 'bg-warm'}
+                  ${isComplete ? 'bg-teal' : isActive ? 'bg-gold' : 'bg-gray'}
                 `}
                 title={surface.label}
               />
@@ -155,20 +173,39 @@ export function MeasurementOverlay({
         </div>
       </div>
 
-      {/* Continue button */}
-      <button
-        onClick={onComplete}
-        disabled={!allMeasured}
-        className={`
-          w-full mt-6 py-4 px-6 rounded-full font-semibold text-lg transition-all
-          ${allMeasured
-            ? 'bg-accent text-white hover:shadow-lg hover:-translate-y-0.5'
-            : 'bg-warm text-ink/40 cursor-not-allowed'
-          }
-        `}
-      >
-        {allMeasured ? 'Continue to Preferences' : `Enter all ${measurements.length} measurements`}
-      </button>
+      {/* Action buttons */}
+      <div className="mt-6 space-y-3">
+        <button
+          onClick={onComplete}
+          disabled={!canContinue}
+          className={`
+            w-full py-4 px-6 rounded-full font-semibold text-lg transition-all
+            ${canContinue
+              ? 'bg-teal text-white hover:bg-teal-dark hover:shadow-lg'
+              : 'bg-gray text-ink/40 cursor-not-allowed'
+            }
+          `}
+        >
+          Continue to Preferences
+        </button>
+
+        {/* Skip option */}
+        <button
+          onClick={() => {
+            // Use all estimates for unmeasured surfaces
+            surfaces.forEach((surface) => {
+              const measurement = measurements.find((m) => m.id === surface.id);
+              if (!measurement?.value && surface.estimated_cm) {
+                onUpdateMeasurement(surface.id, surface.estimated_cm);
+              }
+            });
+            onComplete();
+          }}
+          className="w-full py-3 px-6 text-gray-dark hover:text-ink transition-colors text-sm font-medium"
+        >
+          Skip — use AI estimates for all
+        </button>
+      </div>
     </div>
   );
 }
