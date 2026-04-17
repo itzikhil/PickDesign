@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { DesignSuggestion } from '../components/DesignSuggestion';
@@ -8,7 +8,7 @@ import { InteractivePhotoOverlay } from '../components/InteractivePhotoOverlay';
 import { useApp } from '../context/AppContext';
 import { generateDesignRecommendation } from '../lib/claude';
 import { matchProducts } from '../lib/products';
-import type { RecommendedItem, DesignIntent, ProductMatch } from '../lib/types';
+import type { RecommendedItem, DesignIntent, FixedElement, ProductMatch, RenderedAngle } from '../lib/types';
 
 function getAmazonSearchUrl(query: string): string {
   return `https://www.amazon.de/s?k=${encodeURIComponent(query)}&tag=pickdesign-21`;
@@ -79,31 +79,141 @@ function ShopItem({ match, index }: { match: ProductMatch; index: number }) {
   );
 }
 
+function AngleCarousel({
+  photos,
+  renderedAngles,
+  items,
+}: {
+  photos: string[];
+  renderedAngles: RenderedAngle[];
+  items: RecommendedItem[];
+}) {
+  const [active, setActive] = useState(0);
+  const single = photos.length === 1;
+  const current = renderedAngles[active] ?? { image: null, type: null };
+  const currentPhoto = photos[active];
+
+  return (
+    <div>
+      {!single && (
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Angle selector">
+          {photos.map((_, i) => {
+            const hasRender = !!renderedAngles[i]?.image;
+            const isActive = i === active;
+            return (
+              <button
+                key={i}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActive(i)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-teal text-white shadow-sm'
+                    : 'bg-white border border-warm text-ink/70 hover:text-ink hover:border-accent'
+                }`}
+              >
+                Angle {i + 1}{i === 0 ? ' · Hero' : ''}
+                {!hasRender && (
+                  <span
+                    className={`ml-2 text-[10px] uppercase tracking-wide ${isActive ? 'text-white/80' : 'text-ink/40'}`}
+                  >
+                    render failed
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {current.image ? (
+        <>
+          <BeforeAfterSlider
+            key={active}
+            beforeImage={currentPhoto}
+            afterImage={current.image}
+            beforeLabel="Before"
+            afterLabel="After"
+          />
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold text-ink mb-3">
+              Click to explore products{single ? '' : ` in Angle ${active + 1}`}
+            </h3>
+            <InteractivePhotoOverlay photoUrl={current.image} items={items} />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="relative rounded-2xl overflow-hidden border border-warm">
+            <img src={currentPhoto} alt={`Angle ${active + 1}`} className="w-full h-auto" />
+            <div className="absolute top-4 left-4 px-3 py-1.5 bg-ink/80 text-white text-sm font-medium rounded-full backdrop-blur-sm">
+              Angle {active + 1} · render unavailable
+            </div>
+          </div>
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold text-ink mb-3">
+              Your space with product recommendations
+            </h3>
+            <InteractivePhotoOverlay photoUrl={currentPhoto} items={items} />
+          </div>
+        </>
+      )}
+
+      {!single && (
+        <p className="mt-3 text-xs text-ink/50 text-center">
+          Showing Angle {active + 1} of {photos.length}. Tap a tab to switch angles.
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface RenderResponse {
+  renderedAngles: RenderedAngle[];
+  moodboardImage: string | null;
+}
+
 async function renderDesignVisualization(
-  heroPhoto: string,
+  photos: string[],
   recommendation: { concept: string; items: RecommendedItem[]; wall_color?: { name: string; hex: string } },
-  designIntent: DesignIntent
-): Promise<{ image: string | null; type: 'redesign' | 'moodboard' | null }> {
+  designIntent: DesignIntent,
+  fixedElements: FixedElement[]
+): Promise<RenderResponse> {
+  const empty: RenderResponse = {
+    renderedAngles: photos.map(() => ({ image: null, type: null })),
+    moodboardImage: null,
+  };
   try {
     const response = await fetch('/api/render', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photo: heroPhoto, recommendation, designIntent }),
+      body: JSON.stringify({ photos, recommendation, designIntent, fixedElements }),
     });
 
     if (!response.ok) {
       console.warn('Image rendering not available');
-      return { image: null, type: null };
+      return empty;
     }
 
     const data = await response.json();
+    const renders: RenderedAngle[] = Array.isArray(data.renders)
+      ? data.renders.map((r: { image?: string | null; type?: 'redesign' | null }) => ({
+          image: r?.image ?? null,
+          type: r?.type === 'redesign' ? 'redesign' : null,
+        }))
+      : empty.renderedAngles;
+
+    // Pad or trim to match photo count so index alignment is guaranteed.
+    const aligned: RenderedAngle[] = photos.map((_, i) => renders[i] ?? { image: null, type: null });
+
     return {
-      image: data.image || null,
-      type: data.type || null,
+      renderedAngles: aligned,
+      moodboardImage: typeof data.moodboard === 'string' ? data.moodboard : null,
     };
   } catch (error) {
     console.warn('Image rendering failed:', error);
-    return { image: null, type: null };
+    return empty;
   }
 }
 
@@ -111,7 +221,6 @@ export function ResultsPage() {
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const heroPhoto = state.photos[0] ?? null;
-  const additionalPhotos = state.photos.slice(1);
 
   // Redirect if missing required data
   useEffect(() => {
@@ -147,16 +256,20 @@ export function ResultsPage() {
           dispatch({ type: 'SET_PRODUCT_MATCHES', payload: matches });
           dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
 
-          // Try to generate visualization (non-blocking) — uses hero angle
+          // Try to generate per-angle visualizations (non-blocking)
           dispatch({ type: 'SET_RENDERING_IMAGE', payload: true });
           const renderResult = await renderDesignVisualization(
-            state.photos[0],
+            state.photos,
             recommendation,
-            state.preferences.designIntent || 'refresh'
+            state.preferences.designIntent || 'refresh',
+            state.spaceAnalysis?.fixed_elements ?? []
           );
           dispatch({
-            type: 'SET_RENDERED_IMAGE',
-            payload: { image: renderResult.image, renderType: renderResult.type },
+            type: 'SET_RENDERED_ANGLES',
+            payload: {
+              renderedAngles: renderResult.renderedAngles,
+              moodboardImage: renderResult.moodboardImage,
+            },
           });
           dispatch({ type: 'SET_RENDERING_IMAGE', payload: false });
         })
@@ -227,120 +340,56 @@ export function ResultsPage() {
                 </p>
               </div>
 
-              {/* Multi-angle notice */}
-              {additionalPhotos.length > 0 && (
-                <div className="mb-4 px-4 py-3 bg-teal-light/40 border border-teal/20 rounded-xl flex items-start gap-3">
-                  <svg className="w-5 h-5 text-teal flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm text-ink/80">
-                    The before/after below shows your <span className="font-semibold">hero angle</span>. Your design accounts for all {state.photos.length} angles — see the concept below for items on walls not visible here.
-                  </p>
-                </div>
-              )}
-
-              {/* Hero: Before/After visualization */}
+              {/* Visualization: single slider OR multi-angle carousel */}
               <div className="mb-8">
                 {state.isRenderingImage ? (
                   <div className="bg-white rounded-2xl p-8 border border-warm">
                     <LoadingSpinner
-                      message="Creating preview"
+                      message={state.photos.length > 1 ? `Rendering ${state.photos.length} angles` : 'Creating preview'}
                       submessage="Bringing your new space to life..."
                     />
                   </div>
-                ) : state.renderedImage && state.renderType === 'redesign' ? (
-                  // Show before/after slider for redesign images
-                  <div>
-                    <BeforeAfterSlider
-                      beforeImage={heroPhoto}
-                      afterImage={state.renderedImage}
-                      beforeLabel="Before"
-                      afterLabel="After"
-                    />
-                    {/* Product pins on after image */}
-                    <div className="mt-6">
-                      <h3 className="text-lg font-semibold text-ink mb-3">
-                        Click to explore products
-                      </h3>
-                      <InteractivePhotoOverlay
-                        photoUrl={state.renderedImage}
-                        items={state.designRecommendation.items}
-                      />
-                    </div>
-                  </div>
-                ) : state.renderedImage && state.renderType === 'moodboard' ? (
-                  // Show mood board alongside original photo
+                ) : state.moodboardImage ? (
+                  // All angle renders failed — fall back to a single mood board layout.
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Original photo */}
                       <div className="relative">
                         <span className="absolute top-4 left-4 z-10 px-3 py-1.5 bg-ink/80 text-white text-sm font-medium rounded-full backdrop-blur-sm">
                           Your Space
                         </span>
-                        <img
-                          src={heroPhoto}
-                          alt="Your space"
-                          className="w-full rounded-2xl shadow-md"
-                        />
+                        <img src={heroPhoto} alt="Your space" className="w-full rounded-2xl shadow-md" />
                       </div>
-                      {/* Mood board */}
                       <div className="relative">
                         <span className="absolute top-4 left-4 z-10 px-3 py-1.5 bg-accent text-white text-sm font-medium rounded-full shadow-lg">
                           Design Mood Board
                         </span>
-                        <img
-                          src={state.renderedImage}
-                          alt="Design mood board"
-                          className="w-full rounded-2xl shadow-md"
-                        />
+                        <img src={state.moodboardImage} alt="Design mood board" className="w-full rounded-2xl shadow-md" />
                       </div>
                     </div>
-                    <p className="text-center text-sm text-ink/50">
-                      Your inspiration board
-                    </p>
-                    {/* Product pins on original photo */}
+                    <p className="text-center text-sm text-ink/50">Your inspiration board</p>
                     <div>
                       <h3 className="text-lg font-semibold text-ink mb-3">
                         Click to explore products in your space
                       </h3>
-                      <InteractivePhotoOverlay
-                        photoUrl={heroPhoto}
-                        items={state.designRecommendation.items}
-                      />
+                      <InteractivePhotoOverlay photoUrl={heroPhoto} items={state.designRecommendation.items} />
                     </div>
                   </div>
+                ) : state.renderedAngles.some((r) => r.image) ? (
+                  <AngleCarousel
+                    photos={state.photos}
+                    renderedAngles={state.renderedAngles}
+                    items={state.designRecommendation.items}
+                  />
                 ) : (
-                  // Fallback: just show original photo with pins
+                  // Fallback: show original(s) with pins
                   <div>
                     <h3 className="text-lg font-semibold text-ink mb-3">
                       Your space with product recommendations
                     </h3>
-                    <InteractivePhotoOverlay
-                      photoUrl={heroPhoto}
-                      items={state.designRecommendation.items}
-                    />
+                    <InteractivePhotoOverlay photoUrl={heroPhoto} items={state.designRecommendation.items} />
                   </div>
                 )}
               </div>
-
-              {/* Other angles */}
-              {additionalPhotos.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-sm font-semibold text-ink/70 mb-3 uppercase tracking-wide">
-                    Other angles you shared
-                  </h3>
-                  <div className="flex gap-3 overflow-x-auto pb-1">
-                    {additionalPhotos.map((photo, i) => (
-                      <div key={i} className="flex-shrink-0 w-32">
-                        <div className="relative aspect-square rounded-xl overflow-hidden border border-warm">
-                          <img src={photo} alt={`Angle ${i + 2}`} className="w-full h-full object-cover" />
-                        </div>
-                        <p className="text-xs text-ink/60 mt-1.5 text-center">Angle {i + 2}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Design suggestion */}
               <DesignSuggestion recommendation={state.designRecommendation} />

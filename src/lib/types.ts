@@ -7,13 +7,25 @@ export interface SurfaceToMeasure {
   estimated_cm?: number; // AI-estimated measurement
 }
 
+export interface FixedElement {
+  item: string;
+  location: string;
+}
+
 export interface SpaceAnalysis {
   space_type: string;
   surfaces_to_measure: SurfaceToMeasure[];
   existing_items: string[];
+  fixed_elements: FixedElement[]; // Permanently installed items that must not be moved/removed
   constraints: string[];
   lighting: string;
   suggested_intent?: 'refresh' | 'redesign' | 'fill'; // AI-suggested design intent based on room state
+}
+
+// One rendered "after" image per uploaded angle (aligned with AppState.photos by index).
+export interface RenderedAngle {
+  image: string | null;
+  type: 'redesign' | null;
 }
 
 // Measurement Types
@@ -112,9 +124,10 @@ export interface AppState {
   productMatches: ProductMatch[];
   isLoadingProducts: boolean;
 
-  // Step 7: Rendered visualization
-  renderedImage: string | null; // base64 data URL of AI-generated redesign
-  renderType: 'redesign' | 'moodboard' | null; // type of render generated
+  // Step 7: Rendered visualizations (one per uploaded angle, aligned by index)
+  renderedAngles: RenderedAngle[];
+  // Global mood board fallback, used when all per-angle redesigns failed
+  moodboardImage: string | null;
   isRenderingImage: boolean;
 }
 

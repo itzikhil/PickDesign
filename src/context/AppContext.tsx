@@ -6,6 +6,7 @@ import type {
   UserPreferences,
   DesignRecommendation,
   ProductMatch,
+  RenderedAngle,
   DesignIntent,
   SpaceType,
   Goal,
@@ -35,8 +36,8 @@ const initialState: AppState = {
   isGeneratingDesign: false,
   productMatches: [],
   isLoadingProducts: false,
-  renderedImage: null,
-  renderType: null,
+  renderedAngles: [],
+  moodboardImage: null,
   isRenderingImage: false,
 };
 
@@ -59,7 +60,7 @@ type Action =
   | { type: 'SET_LOADING_PRODUCTS'; payload: boolean }
   | { type: 'SET_PRODUCT_MATCHES'; payload: ProductMatch[] }
   | { type: 'SET_RENDERING_IMAGE'; payload: boolean }
-  | { type: 'SET_RENDERED_IMAGE'; payload: { image: string | null; renderType: 'redesign' | 'moodboard' | null } }
+  | { type: 'SET_RENDERED_ANGLES'; payload: { renderedAngles: RenderedAngle[]; moodboardImage: string | null } }
   | { type: 'CLEAR_DESIGN' }
   | { type: 'RESET' };
 
@@ -183,19 +184,19 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, productMatches: action.payload };
     case 'SET_RENDERING_IMAGE':
       return { ...state, isRenderingImage: action.payload };
-    case 'SET_RENDERED_IMAGE':
+    case 'SET_RENDERED_ANGLES':
       return {
         ...state,
-        renderedImage: action.payload.image,
-        renderType: action.payload.renderType,
+        renderedAngles: action.payload.renderedAngles,
+        moodboardImage: action.payload.moodboardImage,
       };
     case 'CLEAR_DESIGN':
       return {
         ...state,
         designRecommendation: null,
         productMatches: [],
-        renderedImage: null,
-        renderType: null,
+        renderedAngles: [],
+        moodboardImage: null,
       };
     case 'RESET':
       return initialState;

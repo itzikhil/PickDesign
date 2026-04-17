@@ -138,9 +138,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? `The user uploaded ${photoList.length} angles of the same room (Angle 1 through Angle ${photoList.length}, in order). Angle 1 is the hero image used for the before/after render. Design for the full space seen across all angles.\n\n`
       : '';
 
+    const fixedElements = Array.isArray(spaceAnalysis.fixed_elements)
+      ? spaceAnalysis.fixed_elements
+      : [];
+    const fixedElementsList = fixedElements
+      .map((f: { item: string; location: string }) => `- ${f.item} (${f.location})`)
+      .join('\n');
+    const fixedElementsBlock = fixedElements.length > 0
+      ? `\nFIXED ELEMENTS — these items are permanently installed and CANNOT be moved or removed. Design around them:\n${fixedElementsList}\n`
+      : '';
+
     const contextText = `
 ${anglePreamble}${intentInstructions}
-
+${fixedElementsBlock}
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
 - Existing items: ${spaceAnalysis.existing_items?.join(', ') || 'None'}

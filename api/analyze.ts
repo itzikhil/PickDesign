@@ -9,9 +9,19 @@ Identify:
 1. The type of space (corner, wall, alcove, shelf, full room)
 2. The 2-3 MOST IMPORTANT surfaces to measure (no more than 3!)
 3. Existing furniture or fixtures (across all angles)
-4. Lighting conditions
-5. Any constraints (windows, doors, outlets, radiators) visible in any angle
-6. Suggested design intent based on the current state:
+4. FIXED ELEMENTS that are permanently installed and CANNOT be moved or removed. Include only items from these categories that actually appear in the photos:
+   - wall-mounted TVs
+   - fireplaces
+   - radiators
+   - built-in shelving or cabinetry
+   - windows
+   - doors
+   - ceiling lights / chandeliers
+   - structural beams or columns
+   For each, give a short "item" name and a "location" description ("center of main wall", "under window on right wall", etc.)
+5. Lighting conditions
+6. Any other constraints not covered by fixed elements
+7. Suggested design intent based on the current state:
    - "redesign" if the room is cluttered, messy, or has outdated furniture that should be replaced
    - "refresh" if the room is already organized but could use some finishing touches or additional items
    - "fill" if the room is mostly empty and needs furnishing
@@ -20,6 +30,7 @@ IMPORTANT:
 - Only include 2-3 surfaces maximum - focus on the most critical dimensions
 - For each surface, estimate the measurement in centimeters based on typical room proportions and any visible reference objects
 - Your estimates don't need to be perfect - they help users know what to expect
+- fixed_elements must be an array (empty if none are visible). Only list items you can actually see.
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
 {
@@ -40,7 +51,11 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text, no
       "estimated_cm": 120
     }
   ],
-  "existing_items": ["radiator on right wall", "window"],
+  "existing_items": ["sofa", "coffee table"],
+  "fixed_elements": [
+    { "item": "wall-mounted TV", "location": "center of main wall" },
+    { "item": "radiator", "location": "under window, right wall" }
+  ],
   "constraints": ["radiator limits depth on right side"],
   "lighting": "natural light from window, no overhead fixture visible",
   "suggested_intent": "refresh"
@@ -126,6 +141,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         error: 'Failed to parse Gemini response as JSON',
         rawResponse: cleanedText.substring(0, 500)
       });
+    }
+
+    // Guarantee fixed_elements is always an array so downstream code can rely on it.
+    if (!Array.isArray(analysis.fixed_elements)) {
+      analysis.fixed_elements = [];
     }
 
     return res.status(200).json(analysis);
