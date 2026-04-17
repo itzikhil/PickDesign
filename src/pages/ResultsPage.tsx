@@ -80,7 +80,7 @@ function ShopItem({ match, index }: { match: ProductMatch; index: number }) {
 }
 
 async function renderDesignVisualization(
-  photo: string,
+  heroPhoto: string,
   recommendation: { concept: string; items: RecommendedItem[]; wall_color?: { name: string; hex: string } },
   designIntent: DesignIntent
 ): Promise<{ image: string | null; type: 'redesign' | 'moodboard' | null }> {
@@ -88,7 +88,7 @@ async function renderDesignVisualization(
     const response = await fetch('/api/render', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photo, recommendation, designIntent }),
+      body: JSON.stringify({ photo: heroPhoto, recommendation, designIntent }),
     });
 
     if (!response.ok) {
@@ -110,18 +110,20 @@ async function renderDesignVisualization(
 export function ResultsPage() {
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const heroPhoto = state.photos[0] ?? null;
+  const additionalPhotos = state.photos.slice(1);
 
   // Redirect if missing required data
   useEffect(() => {
-    if (!state.photo || !state.spaceAnalysis || !state.preferences.designIntent || state.preferences.spaceTypes.length === 0) {
+    if (!heroPhoto || !state.spaceAnalysis || !state.preferences.designIntent || state.preferences.spaceTypes.length === 0) {
       navigate('/');
     }
-  }, [state.photo, state.spaceAnalysis, state.preferences.designIntent, state.preferences.spaceTypes, navigate]);
+  }, [heroPhoto, state.spaceAnalysis, state.preferences.designIntent, state.preferences.spaceTypes, navigate]);
 
   // Generate design on mount
   useEffect(() => {
     if (
-      state.photo &&
+      state.photos.length > 0 &&
       state.spaceAnalysis &&
       state.preferences.designIntent &&
       state.preferences.spaceTypes.length > 0 &&
@@ -131,7 +133,7 @@ export function ResultsPage() {
       dispatch({ type: 'SET_GENERATING_DESIGN', payload: true });
 
       generateDesignRecommendation(
-        state.photo,
+        state.photos,
         state.spaceAnalysis,
         state.measurements,
         state.preferences
@@ -145,10 +147,10 @@ export function ResultsPage() {
           dispatch({ type: 'SET_PRODUCT_MATCHES', payload: matches });
           dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
 
-          // Try to generate visualization (non-blocking)
+          // Try to generate visualization (non-blocking) — uses hero angle
           dispatch({ type: 'SET_RENDERING_IMAGE', payload: true });
           const renderResult = await renderDesignVisualization(
-            state.photo!,
+            state.photos[0],
             recommendation,
             state.preferences.designIntent || 'refresh'
           );
@@ -168,7 +170,7 @@ export function ResultsPage() {
         });
     }
   }, [
-    state.photo,
+    state.photos,
     state.spaceAnalysis,
     state.measurements,
     state.preferences,
@@ -194,7 +196,7 @@ export function ResultsPage() {
   };
 
 
-  if (!state.photo || !state.spaceAnalysis) {
+  if (!heroPhoto || !state.spaceAnalysis) {
     return null;
   }
 
@@ -225,6 +227,18 @@ export function ResultsPage() {
                 </p>
               </div>
 
+              {/* Multi-angle notice */}
+              {additionalPhotos.length > 0 && (
+                <div className="mb-4 px-4 py-3 bg-teal-light/40 border border-teal/20 rounded-xl flex items-start gap-3">
+                  <svg className="w-5 h-5 text-teal flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-ink/80">
+                    The before/after below shows your <span className="font-semibold">hero angle</span>. Your design accounts for all {state.photos.length} angles — see the concept below for items on walls not visible here.
+                  </p>
+                </div>
+              )}
+
               {/* Hero: Before/After visualization */}
               <div className="mb-8">
                 {state.isRenderingImage ? (
@@ -238,7 +252,7 @@ export function ResultsPage() {
                   // Show before/after slider for redesign images
                   <div>
                     <BeforeAfterSlider
-                      beforeImage={state.photo}
+                      beforeImage={heroPhoto}
                       afterImage={state.renderedImage}
                       beforeLabel="Before"
                       afterLabel="After"
@@ -264,7 +278,7 @@ export function ResultsPage() {
                           Your Space
                         </span>
                         <img
-                          src={state.photo}
+                          src={heroPhoto}
                           alt="Your space"
                           className="w-full rounded-2xl shadow-md"
                         />
@@ -290,7 +304,7 @@ export function ResultsPage() {
                         Click to explore products in your space
                       </h3>
                       <InteractivePhotoOverlay
-                        photoUrl={state.photo}
+                        photoUrl={heroPhoto}
                         items={state.designRecommendation.items}
                       />
                     </div>
@@ -302,12 +316,31 @@ export function ResultsPage() {
                       Your space with product recommendations
                     </h3>
                     <InteractivePhotoOverlay
-                      photoUrl={state.photo}
+                      photoUrl={heroPhoto}
                       items={state.designRecommendation.items}
                     />
                   </div>
                 )}
               </div>
+
+              {/* Other angles */}
+              {additionalPhotos.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-sm font-semibold text-ink/70 mb-3 uppercase tracking-wide">
+                    Other angles you shared
+                  </h3>
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {additionalPhotos.map((photo, i) => (
+                      <div key={i} className="flex-shrink-0 w-32">
+                        <div className="relative aspect-square rounded-xl overflow-hidden border border-warm">
+                          <img src={photo} alt={`Angle ${i + 2}`} className="w-full h-full object-cover" />
+                        </div>
+                        <p className="text-xs text-ink/60 mt-1.5 text-center">Angle {i + 2}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Design suggestion */}
               <DesignSuggestion recommendation={state.designRecommendation} />

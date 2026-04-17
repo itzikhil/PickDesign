@@ -28,6 +28,8 @@ function getDesignIntentInstructions(intent: string): string {
 
 const BASE_RECOMMENDATION_PROMPT = `You are an interior designer. Given the space analysis, user dimensions, preferences, and design approach, suggest a cohesive design.
 
+When multiple photos are provided, they are multiple angles of the SAME room. Design for the ENTIRE space — all walls, corners, and areas visible across every angle — not just what's in one photo. Angle 1 is the "hero" angle that will be shown in the before/after visualization.
+
 Rules:
 - Every item MUST fit within the provided dimensions (leave 2-3cm clearance)
 - Respect constraints (don't block radiators, windows, doors)
@@ -36,7 +38,8 @@ Rules:
 - Include wall color if relevant
 - The search_query should be optimized for finding products on Amazon.de or German furniture stores
 - Include realistic EUR price ranges for each item
-- Include position_hint as x,y percentages (0-100) indicating where the item would be placed in the photo
+- Include position_hint as x,y percentages (0-100) indicating where the item would be placed in the HERO photo (Angle 1). For items on walls not visible in Angle 1, omit position_hint.
+- In the "concept" field, briefly mention any items or changes that go on walls/areas NOT visible in the hero angle (Angle 1), so the user understands the full design.
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
 {
@@ -74,10 +77,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not configured' });
     }
 
-    const { photo, spaceAnalysis, measurements, preferences } = req.body;
+    const { photo, photos, spaceAnalysis, measurements, preferences } = req.body;
 
-    if (!photo) {
-      return res.status(400).json({ error: 'Missing required field: photo' });
+    const photoList: string[] = Array.isArray(photos)
+      ? photos
+      : typeof photo === 'string'
+      ? [photo]
+      : [];
+
+    if (photoList.length === 0) {
+      return res.status(400).json({ error: 'Missing required field: photos' });
     }
     if (!spaceAnalysis) {
       return res.status(400).json({ error: 'Missing required field: spaceAnalysis' });
@@ -89,10 +98,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required field: preferences' });
     }
 
-    // Extract base64 data and media type
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const mediaTypeMatch = photo.match(/^data:(image\/\w+);base64,/);
-    const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
+    const imageParts = photoList.map((p) => {
+      const base64Data = p.replace(/^data:image\/\w+;base64,/, '');
+      const mediaTypeMatch = p.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
+      return { inlineData: { mimeType, data: base64Data } };
+    });
 
     // Build context
     const measurementsText = measurements
@@ -123,8 +134,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const designIntent = preferences.designIntent || 'refresh';
     const intentInstructions = getDesignIntentInstructions(designIntent);
 
+    const anglePreamble = photoList.length > 1
+      ? `The user uploaded ${photoList.length} angles of the same room (Angle 1 through Angle ${photoList.length}, in order). Angle 1 is the hero image used for the before/after render. Design for the full space seen across all angles.\n\n`
+      : '';
+
     const contextText = `
-${intentInstructions}
+${anglePreamble}${intentInstructions}
 
 Space Analysis:
 - Type: ${spaceAnalysis.space_type}
@@ -149,12 +164,7 @@ User Preferences:
     let result;
     try {
       result = await model.generateContent([
-        {
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        },
+        ...imageParts,
         { text: `${BASE_RECOMMENDATION_PROMPT}\n\nContext:\n${contextText}` },
       ]);
     } catch (geminiError) {

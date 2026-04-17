@@ -2,12 +2,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const SPACE_ANALYSIS_PROMPT = `You are a spatial analysis assistant for interior design.
-Analyze the uploaded photo and identify:
+
+If multiple photos are provided, they are multiple angles of the SAME room. Analyze them together to understand the full space layout — all walls, furniture, windows, and doors. Merge observations from every angle rather than analyzing each one separately.
+
+Identify:
 1. The type of space (corner, wall, alcove, shelf, full room)
 2. The 2-3 MOST IMPORTANT surfaces to measure (no more than 3!)
-3. Existing furniture or fixtures
+3. Existing furniture or fixtures (across all angles)
 4. Lighting conditions
-5. Any constraints (windows, doors, outlets, radiators)
+5. Any constraints (windows, doors, outlets, radiators) visible in any angle
 6. Suggested design intent based on the current state:
    - "redesign" if the room is cluttered, messy, or has outdated furniture that should be replaced
    - "refresh" if the room is already organized but could use some finishing touches or additional items
@@ -54,24 +57,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not configured' });
     }
 
-    const { photo } = req.body;
+    const { photo, photos } = req.body;
 
-    if (!photo) {
-      return res.status(400).json({ error: 'Photo is required in request body' });
+    // Accept either `photos: string[]` (new) or `photo: string` (legacy)
+    const photoList: string[] = Array.isArray(photos)
+      ? photos
+      : typeof photo === 'string'
+      ? [photo]
+      : [];
+
+    if (photoList.length === 0) {
+      return res.status(400).json({ error: 'At least one photo is required' });
     }
 
-    if (typeof photo !== 'string') {
-      return res.status(400).json({ error: 'Photo must be a base64 data URL string' });
+    if (!photoList.every((p) => typeof p === 'string')) {
+      return res.status(400).json({ error: 'Each photo must be a base64 data URL string' });
     }
 
-    // Extract base64 data and media type
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const mediaTypeMatch = photo.match(/^data:(image\/\w+);base64,/);
-    const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
+    const imageParts = photoList.map((p) => {
+      const base64Data = p.replace(/^data:image\/\w+;base64,/, '');
+      const mediaTypeMatch = p.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mediaTypeMatch?.[1] || 'image/jpeg';
+      return { inlineData: { mimeType, data: base64Data } };
+    });
 
-    if (!base64Data) {
+    if (imageParts.some((part) => !part.inlineData.data)) {
       return res.status(400).json({ error: 'Invalid photo format - could not extract base64 data' });
     }
+
+    const anglePreamble = photoList.length > 1
+      ? `The user uploaded ${photoList.length} angles of the same room (labeled Angle 1 through Angle ${photoList.length} in order). Analyze them together.\n\n`
+      : '';
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -79,13 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let result;
     try {
       result = await model.generateContent([
-        {
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        },
-        { text: SPACE_ANALYSIS_PROMPT },
+        ...imageParts,
+        { text: `${anglePreamble}${SPACE_ANALYSIS_PROMPT}` },
       ]);
     } catch (geminiError) {
       const message = geminiError instanceof Error ? geminiError.message : String(geminiError);

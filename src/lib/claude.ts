@@ -1,12 +1,12 @@
 import type { SpaceAnalysis, DesignRecommendation, Measurement, UserPreferences } from './types';
 
-export async function analyzeSpace(photoBase64: string): Promise<SpaceAnalysis> {
+export async function analyzeSpace(photos: string[]): Promise<SpaceAnalysis> {
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ photo: photoBase64 }),
+    body: JSON.stringify({ photos }),
   });
 
   if (!response.ok) {
@@ -18,7 +18,7 @@ export async function analyzeSpace(photoBase64: string): Promise<SpaceAnalysis> 
 }
 
 export async function generateDesignRecommendation(
-  photoBase64: string,
+  photos: string[],
   spaceAnalysis: SpaceAnalysis,
   measurements: Measurement[],
   preferences: UserPreferences
@@ -29,7 +29,7 @@ export async function generateDesignRecommendation(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      photo: photoBase64,
+      photos,
       spaceAnalysis,
       measurements,
       preferences,

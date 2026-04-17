@@ -23,8 +23,10 @@ const initialPreferences: UserPreferences = {
   specialNeeds: [],
 };
 
+export const MAX_PHOTOS = 4;
+
 const initialState: AppState = {
-  photo: null,
+  photos: [],
   spaceAnalysis: null,
   isAnalyzing: false,
   measurements: [],
@@ -39,7 +41,9 @@ const initialState: AppState = {
 };
 
 type Action =
-  | { type: 'SET_PHOTO'; payload: string }
+  | { type: 'SET_PHOTOS'; payload: string[] }
+  | { type: 'ADD_PHOTO'; payload: string }
+  | { type: 'REMOVE_PHOTO'; payload: number }
   | { type: 'SET_ANALYZING'; payload: boolean }
   | { type: 'SET_SPACE_ANALYSIS'; payload: SpaceAnalysis }
   | { type: 'SET_MEASUREMENTS'; payload: Measurement[] }
@@ -65,8 +69,17 @@ function toggleArrayItem<T>(arr: T[], item: T): T[] {
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'SET_PHOTO':
-      return { ...state, photo: action.payload };
+    case 'SET_PHOTOS':
+      return { ...state, photos: action.payload.slice(0, MAX_PHOTOS) };
+    case 'ADD_PHOTO':
+      return state.photos.length >= MAX_PHOTOS
+        ? state
+        : { ...state, photos: [...state.photos, action.payload] };
+    case 'REMOVE_PHOTO':
+      return {
+        ...state,
+        photos: state.photos.filter((_, i) => i !== action.payload),
+      };
     case 'SET_ANALYZING':
       return { ...state, isAnalyzing: action.payload };
     case 'SET_SPACE_ANALYSIS':

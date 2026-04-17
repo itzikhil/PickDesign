@@ -91,8 +91,8 @@ export interface ProductMatch {
 
 // App State
 export interface AppState {
-  // Step 1: Photo
-  photo: string | null; // base64 data URL
+  // Step 1: Photos (up to 4 angles of the same room; photos[0] is the hero)
+  photos: string[]; // base64 data URLs
 
   // Step 2: Analysis
   spaceAnalysis: SpaceAnalysis | null;

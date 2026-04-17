@@ -11,32 +11,34 @@ export function AnalyzePage() {
   const { state, dispatch } = useApp();
   const [showMeasurements, setShowMeasurements] = useState(false);
 
-  // Redirect if no photo
+  const heroPhoto = state.photos[0] ?? null;
+
+  // Redirect if no photos
   useEffect(() => {
-    if (!state.photo) {
+    if (state.photos.length === 0) {
       navigate('/');
     }
-  }, [state.photo, navigate]);
+  }, [state.photos, navigate]);
 
   // Analyze space on mount
   useEffect(() => {
-    if (state.photo && !state.spaceAnalysis && !state.isAnalyzing) {
+    if (state.photos.length > 0 && !state.spaceAnalysis && !state.isAnalyzing) {
       dispatch({ type: 'SET_ANALYZING', payload: true });
 
-      analyzeSpace(state.photo)
+      analyzeSpace(state.photos)
         .then((analysis) => {
           dispatch({ type: 'SET_SPACE_ANALYSIS', payload: analysis });
         })
         .catch((error) => {
           console.error('Failed to analyze space:', error);
-          alert('Failed to analyze the photo. Please try again.');
+          alert('Failed to analyze the photos. Please try again.');
           navigate('/');
         })
         .finally(() => {
           dispatch({ type: 'SET_ANALYZING', payload: false });
         });
     }
-  }, [state.photo, state.spaceAnalysis, state.isAnalyzing, dispatch, navigate]);
+  }, [state.photos, state.spaceAnalysis, state.isAnalyzing, dispatch, navigate]);
 
   const handleUpdateMeasurement = (id: string, value: number | null) => {
     dispatch({ type: 'UPDATE_MEASUREMENT', payload: { id, value } });
@@ -63,7 +65,7 @@ export function AnalyzePage() {
     navigate('/');
   };
 
-  if (!state.photo) {
+  if (!heroPhoto) {
     return null;
   }
 
@@ -91,10 +93,10 @@ export function AnalyzePage() {
             </>
           ) : state.spaceAnalysis ? (
             <>
-              {/* Photo preview */}
-              <div className="relative rounded-2xl overflow-hidden mb-6">
+              {/* Photo preview (hero angle) */}
+              <div className="relative rounded-2xl overflow-hidden mb-4">
                 <img
-                  src={state.photo}
+                  src={heroPhoto}
                   alt="Your space"
                   className="w-full h-auto"
                 />
@@ -105,6 +107,30 @@ export function AnalyzePage() {
                   </p>
                 </div>
               </div>
+
+              {/* Angle thumbnails */}
+              {state.photos.length > 1 && (
+                <div className="mb-6">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {state.photos.map((photo, i) => (
+                      <div
+                        key={i}
+                        className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${
+                          i === 0 ? 'border-teal' : 'border-warm'
+                        }`}
+                      >
+                        <img src={photo} alt={`Angle ${i + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] font-semibold text-center py-0.5">
+                          Angle {i + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-ink/50 mt-2">
+                    Analyzing {state.photos.length} angles together
+                  </p>
+                </div>
+              )}
 
               {/* Simplified flow - default skip */}
               {!showMeasurements ? (
@@ -146,7 +172,7 @@ export function AnalyzePage() {
 
                   {/* Measurement overlay */}
                   <MeasurementOverlay
-                    photoUrl={state.photo}
+                    photoUrl={heroPhoto}
                     surfaces={state.spaceAnalysis.surfaces_to_measure}
                     measurements={state.measurements}
                     onUpdateMeasurement={handleUpdateMeasurement}

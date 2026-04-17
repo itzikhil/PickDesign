@@ -10,10 +10,10 @@ export function PreferencesPage() {
 
   // Redirect if missing required data
   useEffect(() => {
-    if (!state.photo || !state.spaceAnalysis) {
+    if (state.photos.length === 0 || !state.spaceAnalysis) {
       navigate('/');
     }
-  }, [state.photo, state.spaceAnalysis, navigate]);
+  }, [state.photos, state.spaceAnalysis, navigate]);
 
   // Scroll to top on mount
   useEffect(() => {
@@ -28,7 +28,7 @@ export function PreferencesPage() {
     navigate('/analyze');
   };
 
-  if (!state.photo || !state.spaceAnalysis) {
+  if (state.photos.length === 0 || !state.spaceAnalysis) {
     return null;
   }
 

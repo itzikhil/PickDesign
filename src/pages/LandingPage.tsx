@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { MAX_PHOTOS, useApp } from '../context/AppContext';
 
 // Before/After showcase images from Unsplash
 const showcaseItems = [
@@ -95,43 +95,78 @@ function ShowcaseCard({ before, after, label }: { before: string; after: string;
   );
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function LandingPage() {
   const navigate = useNavigate();
   const { dispatch } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [stagedPhotos, setStagedPhotos] = useState<string[]>([]);
 
   const showcase = useScrollReveal();
   const howItWorks = useScrollReveal();
   const upload = useScrollReveal();
 
-  const handleFileSelect = (file: File) => {
-    if (!file.type.startsWith('image/')) {
+  const addFiles = async (files: FileList | File[]) => {
+    const images = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) {
       alert('Please select an image file');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      dispatch({ type: 'SET_PHOTO', payload: dataUrl });
-      navigate('/analyze');
-    };
-    reader.readAsDataURL(file);
+    const remaining = MAX_PHOTOS - stagedPhotos.length;
+    const toRead = images.slice(0, remaining);
+    try {
+      const dataUrls = await Promise.all(toRead.map(readFileAsDataUrl));
+      setStagedPhotos((prev) => [...prev, ...dataUrls].slice(0, MAX_PHOTOS));
+      // Make sure the staging UI is visible after upload
+      requestAnimationFrame(() => {
+        document
+          .getElementById('upload-section')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    } catch {
+      alert('Could not read one of the selected images.');
+    }
+  };
+
+  const openPicker = () => {
+    if (stagedPhotos.length >= MAX_PHOTOS) return;
+    fileInputRef.current?.click();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileSelect(file);
+    if (e.target.files) void addFiles(e.target.files);
+    e.target.value = '';
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFileSelect(file);
+    if (e.dataTransfer.files) void addFiles(e.dataTransfer.files);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+  };
+
+  const removeStaged = (index: number) => {
+    setStagedPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const startDesigning = () => {
+    if (stagedPhotos.length === 0) {
+      openPicker();
+      return;
+    }
+    dispatch({ type: 'SET_PHOTOS', payload: stagedPhotos });
+    navigate('/analyze');
   };
 
   return (
@@ -143,7 +178,7 @@ export function LandingPage() {
             Pick<span className="text-teal">Design</span>
           </span>
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={openPicker}
             className="btn-primary text-sm py-2.5 px-5"
           >
             Start Designing
@@ -168,7 +203,7 @@ export function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: '0.3s' }}>
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openPicker}
                 className="btn-primary text-lg px-8 py-4"
               >
                 Design Your Space
@@ -301,8 +336,9 @@ export function LandingPage() {
 
       {/* Upload Section with Background */}
       <section
+        id="upload-section"
         ref={upload.ref}
-        className={`relative py-32 transition-all duration-1000 ${upload.isVisible ? 'opacity-100' : 'opacity-0'}`}
+        className={`relative py-32 transition-all duration-1000 ${upload.isVisible || stagedPhotos.length > 0 ? 'opacity-100' : 'opacity-0'}`}
       >
         {/* Background image */}
         <div className="absolute inset-0">
@@ -320,41 +356,102 @@ export function LandingPage() {
             Ready to transform your space?
           </h2>
           <p className="text-white/80 text-lg mb-10 max-w-xl mx-auto">
-            Upload a photo and get your personalized design in minutes. No design skills required.
+            Upload a photo and get your personalized design in minutes. One photo works great — add up to {MAX_PHOTOS} angles for richer results.
           </p>
 
-          {/* Upload area */}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            className="bg-white/10 backdrop-blur-sm border-2 border-dashed border-white/30 rounded-2xl p-12 cursor-pointer hover:bg-white/20 hover:border-white/50 transition-all group"
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleInputChange}
-              className="hidden"
-            />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            onChange={handleInputChange}
+            className="hidden"
+          />
 
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-teal flex items-center justify-center group-hover:scale-110 transition-transform">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white text-xl font-semibold mb-1">
-                  Upload your room photo
-                </p>
-                <p className="text-white/60 text-sm">
-                  or drag and drop here
-                </p>
+          {stagedPhotos.length === 0 ? (
+            /* Empty-state upload area */
+            <div
+              onClick={openPicker}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              className="bg-white/10 backdrop-blur-sm border-2 border-dashed border-white/30 rounded-2xl p-12 cursor-pointer hover:bg-white/20 hover:border-white/50 transition-all group"
+            >
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-teal flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white text-xl font-semibold mb-1">
+                    Upload your room photo
+                  </p>
+                  <p className="text-white/60 text-sm">
+                    or drag and drop here · up to {MAX_PHOTOS} angles
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Staging: thumbnail strip + continue */
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 md:p-8"
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
+                {stagedPhotos.map((photo, i) => (
+                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden group">
+                    <img src={photo} alt={`Angle ${i + 1}`} className="w-full h-full object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
+                      <p className="text-white text-xs font-semibold">
+                        Angle {i + 1}{i === 0 ? ' · Hero' : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeStaged(i); }}
+                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                      aria-label={`Remove Angle ${i + 1}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+
+                {stagedPhotos.length < MAX_PHOTOS && (
+                  <button
+                    type="button"
+                    onClick={openPicker}
+                    className="aspect-square rounded-xl border-2 border-dashed border-white/40 hover:border-white/70 hover:bg-white/5 text-white/80 hover:text-white transition-colors flex flex-col items-center justify-center gap-1"
+                  >
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="text-xs font-medium">Add angle</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p className="text-white/70 text-sm">
+                  {stagedPhotos.length === 1
+                    ? 'One photo is enough — or add more angles for better coverage.'
+                    : `${stagedPhotos.length} angles ready. Angle 1 will be used for the before/after render.`}
+                </p>
+                <button
+                  type="button"
+                  onClick={startDesigning}
+                  className="btn-primary px-6 py-3 text-base whitespace-nowrap"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
